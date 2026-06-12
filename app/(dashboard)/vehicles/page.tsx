@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, Mail, Phone, Eye } from "lucide-react";
+import { Plus, Eye } from "lucide-react";
 import { useVehicles, useJobs } from "@/lib/hooks";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/format";
@@ -85,14 +85,8 @@ function VehicleCard({ vehicle, jobs }: { vehicle: Vehicle; jobs: Job[] }) {
   const serviceDue =
     latest?.status === "delayed" || latest?.status === "pending";
 
-  const slug = vehicle.customerName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "")
-    .slice(0, 12);
-  const email = `${slug || "fleet"}@badartyres.ae`;
-
   return (
-    <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md border border-gray-200 bg-gray-200 md:grid-cols-[260px_1fr_1fr_minmax(220px,1fr)]">
+    <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md border border-gray-200 bg-gray-200 md:grid-cols-[260px_1fr_minmax(220px,1fr)]">
       {/* License plate */}
       <div className="flex flex-col justify-between bg-white p-5">
         <div>
@@ -119,45 +113,25 @@ function VehicleCard({ vehicle, jobs }: { vehicle: Vehicle; jobs: Job[] }) {
       {/* Vehicle metadata */}
       <div className="bg-white p-5">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-          Vehicle Metadata
+          Vehicle Overview
         </p>
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <Meta label="Make" value={vehicle.vehicleType || "—"} />
           <Meta label="Model" value={vehicle.vehicleModel || "—"} />
-          <Meta label="Customer" value={vehicle.customerName || "—"} />
-          <Meta label="Last Job" value={vehicle.lastJobId || "—"} />
+          <Meta label="Owner" value={vehicle.customerName || "—"} />
         </dl>
-      </div>
-
-      {/* Fleet operator */}
-      <div className="bg-white p-5">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-          Fleet Operator
-        </p>
-        <p className="mt-3 text-base font-semibold text-gray-900">
-          {vehicle.customerName}
-        </p>
-        <div className="mt-2 space-y-1.5 text-sm text-gray-600">
-          <p className="flex items-center gap-2">
-            <Mail className="h-3.5 w-3.5 text-gray-400" /> {email}
-          </p>
-          <p className="flex items-center gap-2">
-            <Phone className="h-3.5 w-3.5 text-gray-400" />{" "}
-            {vehicle.mobile || "—"}
-          </p>
-        </div>
       </div>
 
       {/* Maintenance frequency */}
       <div className="flex flex-col justify-between bg-white p-5">
         <div className="text-right">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-            Maintenance Frequency
+            Maintenance History
           </p>
           <p className="mt-1 text-3xl font-bold text-gray-900">
             {jobCount}
             <span className="ml-1 text-xs font-medium text-gray-500">
-              Jobs / LTD
+              Jobs
             </span>
           </p>
           <p

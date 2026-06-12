@@ -310,6 +310,8 @@ export default function CreateJobPage() {
             </div>
 
             <div className="p-5">
+              <div className="overflow-x-auto">
+              <div className="min-w-[440px]">
               {/* Column headers */}
               <div className="grid grid-cols-[1fr_64px_96px_104px_32px] items-center gap-2 border-b border-gray-200 pb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                 <span>Service / Part</span>
@@ -384,6 +386,8 @@ export default function CreateJobPage() {
                     </div>
                   );
                 })}
+              </div>
+              </div>
               </div>
 
               {typeof errors.services?.message === "string" && (

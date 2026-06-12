@@ -132,6 +132,109 @@ function JobRow({ job }: { job: Job }) {
   );
 }
 
+function JobCardMobile({ job }: { job: Job }) {
+  const router = useRouter();
+  const deleteJob = useDeleteJob();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const u = urgency[job.status];
+
+  const handleRowClick = () => {
+    router.push(`/jobs/${job.id}`);
+  };
+
+  const handleMenuClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMenuOpen((prev) => !prev);
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMenuOpen(false);
+    router.push(`/jobs/${job.id}/edit`);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMenuOpen(false);
+    if (confirm("Are you sure you want to delete this job card?")) {
+      deleteJob.mutate(job.id);
+    }
+  };
+
+  return (
+    <div
+      onClick={handleRowClick}
+      className="p-5 bg-white cursor-pointer hover:bg-gray-50 flex flex-col gap-3 relative"
+    >
+      <div className="flex justify-between items-start">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-theme-accent">{job.jobNumber}</span>
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                u.className,
+              )}
+            >
+              {u.label}
+            </span>
+          </div>
+          <div className="text-sm text-gray-500 mt-1">
+            {job.date}, {job.time}
+          </div>
+        </div>
+        <div className="relative">
+          <button
+            onClick={handleMenuClick}
+            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+          >
+            <MoreVertical className="h-5 w-5" />
+          </button>
+          {menuOpen && (
+            <div
+              className="absolute right-0 top-8 z-10 w-36 rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 border border-gray-200"
+              onMouseLeave={() => setMenuOpen(false)}
+            >
+              <button
+                onClick={handleEdit}
+                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                <Edit className="h-4 w-4" /> Edit
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+              >
+                <Trash className="h-4 w-4" /> Delete
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm mt-2">
+        <div>
+          <div className="text-xs text-gray-500">Reg Code</div>
+          <div className="font-medium text-gray-900">{job.vehicleNumber || "—"}</div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-500">Customer Identity</div>
+          <div className="text-gray-900">{job.customerName}</div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-500">Maintenance Specialist</div>
+          <div className="text-gray-900">{job.technician}</div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-500">Totals (Inc. ₹)</div>
+          <div className="font-semibold text-gray-900">₹ {formatCurrency(job.grandTotal)}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function JobsPage() {
   const [tab, setTab] = useState<TabValue>("all");
   const { data: jobs, isLoading, isError, error } = useJobs({ status: tab });
@@ -183,9 +286,11 @@ export default function JobsPage() {
         ))}
       </div>
 
-      {/* Table */}
+      {/* Content Area */}
       <div className="rounded-md border border-gray-200 bg-white">
-        <div className="overflow-x-auto">
+        
+        {/* Desktop Table (Hidden on Mobile/Tablet) */}
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
@@ -240,6 +345,30 @@ export default function JobsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile/Tablet Cards (Hidden on Desktop) */}
+        <div className="block lg:hidden divide-y divide-gray-100">
+          {isLoading &&
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-5">
+                <Skeleton className="h-24 w-full" />
+              </div>
+            ))}
+
+          {!isLoading && rows.map((job) => <JobCardMobile key={job.id} job={job} />)}
+
+          {!isLoading && isError && (
+            <div className="p-12 text-center text-sm text-theme-accent">
+              {(error as Error)?.message ?? "Failed to load job cards. Is the API running?"}
+            </div>
+          )}
+
+          {!isLoading && !isError && rows.length === 0 && (
+            <div className="p-12 text-center text-sm text-gray-500">
+              No job cards match this filter.
+            </div>
+          )}
         </div>
 
         {/* Footer */}

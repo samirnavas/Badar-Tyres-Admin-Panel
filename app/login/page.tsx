@@ -71,7 +71,7 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="mb-12">
             <Image
-              src="/full_logo_black.svg"
+              src="/badar_logo_black.svg"
               alt="Badar Tyres Logo"
               width={220}
               height={70}
@@ -92,7 +92,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <form method="POST" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* USER NAME */}
             <div>
               <label

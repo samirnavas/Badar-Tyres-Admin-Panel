@@ -15,7 +15,8 @@ import { useMetrics, useJobs } from "@/lib/hooks";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, cn } from "@/lib/format";
+import type { Job } from "@/lib/types";
 
 export default function DashboardPage() {
   const metrics = useMetrics();
@@ -55,7 +56,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Metric cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
         <MetricCard
           label="Total Jobs"
           value={m?.totalJobs ?? 0}
@@ -116,7 +117,7 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="hidden lg:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
@@ -179,6 +180,23 @@ export default function DashboardPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="block lg:hidden divide-y divide-gray-100">
+            {jobs.isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="p-4">
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ))
+            ) : (
+              recent.map((job) => <RecentActivityCardMobile key={job.id} job={job} />)
+            )}
+            {!jobs.isLoading && recent.length === 0 && (
+              <div className="px-5 py-10 text-center text-sm text-gray-500">
+                No recent activity to show.
+              </div>
+            )}
           </div>
         </section>
 
@@ -278,3 +296,29 @@ function BaySlot({
     </div>
   );
 }
+
+function RecentActivityCardMobile({ job }: { job: Job }) {
+  const isDelayed = job.status === "delayed";
+  return (
+    <div className={cn("p-4 border-b border-gray-100", isDelayed ? "bg-theme-accent-soft/40" : "bg-white")}>
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <div className={`font-semibold ${isDelayed ? "text-theme-accent" : "text-gray-900"}`}>
+            {job.jobNumber}
+          </div>
+          <div className="text-sm text-gray-900 mt-0.5">{job.customerName}</div>
+        </div>
+        <StatusBadge status={job.status} />
+      </div>
+      <div className="flex justify-between items-end text-sm">
+        <div className="text-gray-600">
+          {job.services[0]?.name ?? "—"}
+        </div>
+        <div className="font-medium text-gray-900">
+          ₹ {formatCurrency(job.grandTotal)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
