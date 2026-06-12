@@ -1,0 +1,188 @@
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
+import { useAuth } from "@/lib/AuthContext";
+import { Loader2, User as UserIcon, Lock, Eye, EyeOff } from "lucide-react";
+
+const loginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type LoginForm = z.infer<typeof loginSchema>;
+
+export default function LoginPage() {
+  const router = useRouter();
+  const { login } = useAuth();
+  const [errorMsg, setErrorMsg] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: api.login,
+    onSuccess: (data) => {
+      if (data.user.role !== "admin") {
+        setErrorMsg("Access denied. Admin privileges required.");
+        return;
+      }
+      login(data.token, data.user);
+      router.push("/");
+    },
+    onError: (err: Error) => {
+      setErrorMsg(err.message || "Failed to login. Check your credentials.");
+    },
+  });
+
+  const onSubmit = (data: LoginForm) => {
+    setErrorMsg("");
+    loginMutation.mutate(data);
+  };
+
+  return (
+    <div className="min-h-screen flex">
+      {/* Left Half - Background Image */}
+      <div className="hidden lg:flex lg:w-[55%] relative">
+        <Image
+          src="/login_bg.png"
+          alt="Workshop Background"
+          fill
+          className="object-cover"
+          priority
+        />
+      </div>
+
+      {/* Right Half - Login Form */}
+      <div className="w-full lg:w-[45%] flex items-center justify-center bg-white px-8 py-12">
+        <div className="w-full max-w-[420px]">
+          {/* Logo */}
+          <div className="mb-12">
+            <Image
+              src="/full_logo_black.svg"
+              alt="Badar Tyres Logo"
+              width={220}
+              height={70}
+              className="w-auto h-16"
+              priority
+            />
+          </div>
+
+          {/* Heading */}
+          <div className="mb-8">
+            <h1 className="text-[1.35rem] font-bold text-gray-900 mb-2">Welcome Back</h1>
+            <p className="text-gray-500 text-[15px]">Please login to your account to continue.</p>
+          </div>
+
+          {errorMsg && (
+            <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-md text-sm mb-6 text-center">
+              {errorMsg}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            {/* USER NAME */}
+            <div>
+              <label
+                className="block text-xs font-medium uppercase tracking-wider text-gray-700 mb-1.5"
+                htmlFor="username"
+              >
+                User Name
+              </label>
+              <div className="relative">
+                <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400" strokeWidth={2} />
+                <input
+                  id="username"
+                  type="text"
+                  className="w-full border border-gray-300 rounded-lg py-3 pl-11 pr-4 text-[15px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-theme-accent focus:ring-1 focus:ring-theme-accent transition-colors"
+                  placeholder="Enter your username"
+                  {...register("username")}
+                />
+              </div>
+              {errors.username && (
+                <p className="text-theme-accent text-xs mt-1.5">{errors.username.message}</p>
+              )}
+            </div>
+
+            {/* PASSWORD */}
+            <div>
+              <label
+                className="block text-xs font-medium uppercase tracking-wider text-gray-700 mb-1.5"
+                htmlFor="password"
+              >
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400" strokeWidth={2} />
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  className="w-full border border-gray-300 rounded-lg py-3 pl-11 pr-11 text-[15px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-theme-accent focus:ring-1 focus:ring-theme-accent transition-colors"
+                  placeholder="••••••••"
+                  {...register("password")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" strokeWidth={1.5} />
+                  ) : (
+                    <Eye className="w-5 h-5" strokeWidth={1.5} />
+                  )}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="text-theme-accent text-xs mt-1.5">{errors.password.message}</p>
+              )}
+            </div>
+
+            {/* Options */}
+            <div className="flex items-center justify-between pt-1 pb-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="rounded border-gray-300 w-4 h-4 text-theme-accent focus:ring-theme-accent"
+                />
+                <span className="text-[14px] text-gray-500">Remember me</span>
+              </label>
+              <a href="#" className="text-[14px] text-theme-accent font-medium hover:text-theme-accent-dark transition-colors">
+                Forgot Password?
+              </a>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loginMutation.isPending}
+              className="w-full bg-theme-accent hover:bg-theme-accent-dark text-white font-semibold rounded-lg px-4 py-3.5 uppercase tracking-wide transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-[15px]"
+            >
+              {loginMutation.isPending && <Loader2 className="w-5 h-5 animate-spin" />}
+              Login
+            </button>
+          </form>
+
+          {/* Footer */}
+          <div className="mt-16 pt-8 border-t border-gray-100 text-center">
+            <p className="text-[11px] tracking-[0.15em] text-gray-400 uppercase font-medium">
+              Internal Use Only <span className="mx-2">•</span> Build 2.4.1
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
