@@ -23,11 +23,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [sidebarOpen]);
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="min-h-screen bg-canvas print:bg-white">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="lg:pl-64">
+      <div className="lg:pl-64 print:pl-0">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
-        <main className="px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+        <main className="px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8 print:p-0">
           {children}
         </main>
       </div>

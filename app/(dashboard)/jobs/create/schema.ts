@@ -4,6 +4,7 @@ export const serviceItemSchema = z.object({
   name: z.string().min(1, "Service required"),
   qty: z.number({ message: "Min 1" }).min(1, "Min 1"),
   rate: z.number({ message: "Invalid" }).min(0, "Invalid"),
+  isTaxable: z.boolean(),
 });
 
 export const createJobSchema = z.object({

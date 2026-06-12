@@ -60,27 +60,31 @@ export default function JobPreviewPage({
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 pb-12">
+    <div className="mx-auto max-w-5xl space-y-6 pb-12 print:max-w-none print:pb-0" style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}>
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <button
             onClick={() => router.back()}
-            className="mt-1 flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+            className="mt-1 flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 print:hidden"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-              Job Card Preview
+              <span className="print:hidden">Job Card Preview</span>
+              <span className="hidden print:inline">TAX INVOICE</span>
             </h1>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-gray-600 print:hidden">
               Review services and financial summary for this vehicle.
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50">
+        <div className="flex items-center gap-2 print:hidden">
+          <button 
+            onClick={() => window.print()}
+            className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50"
+          >
             <Printer className="h-4 w-4" />
           </button>
           <button className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50">
@@ -91,7 +95,7 @@ export default function JobPreviewPage({
 
       <div className="space-y-6">
         {/* Summary Card */}
-        <div className="grid grid-cols-1 divide-y divide-gray-200 overflow-hidden rounded-md border border-theme-accent/20 bg-white md:grid-cols-4 md:divide-x md:divide-y-0">
+        <div className="grid grid-cols-1 divide-y divide-gray-200 overflow-hidden rounded-md border border-theme-accent/20 bg-white md:grid-cols-4 md:divide-x md:divide-y-0 print:grid-cols-4 print:divide-x print:divide-y-0">
           {/* Job Card Info */}
           <div className="flex items-start gap-4 p-5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-theme-accent-soft text-theme-accent">
@@ -177,7 +181,7 @@ export default function JobPreviewPage({
               </div>
               <h2 className="font-bold text-gray-900">Services</h2>
             </div>
-            <button className="flex items-center gap-1 text-xs font-bold tracking-wide text-theme-accent hover:underline">
+            <button className="flex items-center gap-1 text-xs font-bold tracking-wide text-theme-accent hover:underline print:hidden">
               <Plus className="h-3.5 w-3.5" /> ADD NEW SERVICES
             </button>
           </div>
@@ -219,7 +223,7 @@ export default function JobPreviewPage({
             </table>
           </div>
 
-          <div className="grid grid-cols-1 divide-y divide-gray-200 md:grid-cols-2 md:divide-x md:divide-y-0">
+          <div className="grid grid-cols-1 divide-y divide-gray-200 md:grid-cols-2 md:divide-x md:divide-y-0 print:grid-cols-2 print:divide-x print:divide-y-0">
             {/* Notes & Signature */}
             <div className="flex flex-col justify-between p-5 md:min-h-[200px]">
               <div>

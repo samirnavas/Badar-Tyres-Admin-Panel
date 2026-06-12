@@ -7,12 +7,10 @@ import {
   FileText,
   PlusSquare,
   Truck,
-  LogOut,
   Users,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/format";
-
-import { useAuth } from "@/lib/AuthContext";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
@@ -22,34 +20,44 @@ const navItems = [
   { label: "Users Management", href: "/users", icon: Users },
 ];
 
-export function Sidebar() {
+export function Sidebar({
+  open = false,
+  onClose,
+}: {
+  open?: boolean;
+  onClose?: () => void;
+}) {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
-  
-  // Calculate initials safely
-  const name = user?.name || "Workshop Manager";
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .substring(0, 2)
-    .toUpperCase();
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-gray-200 bg-white">
-      <div className="flex items-center gap-3 border-b border-gray-200 px-6 py-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-theme-accent text-white">
-          <Truck className="h-5 w-5" strokeWidth={2.2} />
+    <>
+      {/* Mobile backdrop */}
+      <div
+        aria-hidden
+        onClick={onClose}
+        className={cn(
+          "fixed inset-0 z-30 bg-gray-900/50 transition-opacity lg:hidden",
+          open ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+      />
+
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-gray-200 bg-white transition-transform duration-300 ease-in-out lg:translate-x-0 print:hidden",
+          open ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        <div className="flex items-center border-b border-gray-200 px-6 py-5">
+          <img src="/badar_logo_black.svg" alt="Badar Tyres Logo" className="h-8 w-auto" />
+          <button
+            type="button"
+            onClick={onClose}
+            className="ml-auto flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 lg:hidden"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
-        <div className="leading-tight">
-          <p className="text-lg font-bold tracking-tight text-theme-accent">
-            Badar Tyres
-          </p>
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Enterprise Admin
-          </p>
-        </div>
-      </div>
 
       <nav className="flex-1 space-y-1 px-3 py-5">
         {navItems.map(({ label, href, icon: Icon }) => {
@@ -84,25 +92,7 @@ export function Sidebar() {
           );
         })}
       </nav>
-
-      <div className="border-t border-gray-200 px-4 py-4">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
-            {initials}
-          </span>
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-sm font-semibold text-gray-900">
-              {name}
-            </p>
-            <button 
-              onClick={() => logout()}
-              className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-gray-500 transition-colors hover:text-theme-accent"
-            >
-              <LogOut className="h-3 w-3" /> Sign out
-            </button>
-          </div>
-        </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }

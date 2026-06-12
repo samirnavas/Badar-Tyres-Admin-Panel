@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import { useForm, useFieldArray, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   User,
@@ -21,6 +21,7 @@ import {
 } from "@/lib/hooks";
 import { cn, formatCurrency } from "@/lib/format";
 import { createJobSchema, type CreateJobForm, GST_RATE } from "./schema";
+import { Combobox } from "@/components/ui/Combobox";
 
 export default function CreateJobPage() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function CreateJobPage() {
     register,
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<CreateJobForm>({
     resolver: zodResolver(createJobSchema),
@@ -46,7 +48,7 @@ export default function CreateJobPage() {
       model: "",
       vehicleNumber: "",
       technician: "",
-      services: [{ name: "", qty: 1, rate: 0 }],
+      services: [{ name: "", qty: 1, rate: 0, isTaxable: true }],
     },
   });
 
@@ -57,12 +59,24 @@ export default function CreateJobPage() {
 
   const watchedServices = useWatch({ control, name: "services" }) ?? [];
 
-  const subtotal = watchedServices.reduce((sum, s) => {
-    const qty = Number(s?.qty) || 0;
-    const rate = Number(s?.rate) || 0;
-    return sum + qty * rate;
-  }, 0);
-  const gst = subtotal * GST_RATE;
+  const subtotalData = watchedServices.reduce(
+    (acc, s) => {
+      const qty = Number(s?.qty) || 0;
+      const rate = Number(s?.rate) || 0;
+      const amount = qty * rate;
+      if (s?.isTaxable !== false) {
+        acc.taxable += amount;
+      } else {
+        acc.nonTaxable += amount;
+      }
+      acc.total += amount;
+      return acc;
+    },
+    { taxable: 0, nonTaxable: 0, total: 0 }
+  );
+
+  const subtotal = subtotalData.total;
+  const gst = subtotalData.taxable * GST_RATE;
   const grandTotal = subtotal + gst;
 
   const onSubmit = (values: CreateJobForm) => {
@@ -101,7 +115,7 @@ export default function CreateJobPage() {
         </div>
         <button
           type="button"
-          className="rounded-md border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+          className="hidden rounded-md border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
         >
           Save Draft
         </button>
@@ -158,8 +172,8 @@ export default function CreateJobPage() {
                         className="h-4 w-4 text-theme-accent focus:ring-theme-accent border-gray-300"
                         onChange={(e) => {
                           register("vehicleType").onChange(e);
-                          // Reset manufacturer when vehicle type changes
-                          control._formValues.manufacturer = "";
+                          setValue("manufacturer", "");
+                          setValue("model", "");
                         }}
                       />
                       <span className="text-sm font-medium text-gray-900">{type}</span>
@@ -172,30 +186,24 @@ export default function CreateJobPage() {
                 label="Vehicle Manufacturer"
                 error={errors.manufacturer?.message}
               >
-                <div className="relative">
-                  <select
-                    {...register("manufacturer")}
-                    defaultValue=""
-                    disabled={manufacturers.isLoading}
-                    className={cn(inputClass(!!errors.manufacturer), "appearance-none pr-9")}
-                  >
-                    <option value="" disabled>
-                      {manufacturers.isLoading
-                        ? "Loading manufacturers..."
-                        : "Select Manufacturer..."}
-                    </option>
-                    {(() => {
-                      const type = useWatch({ control, name: "vehicleType" }) || "Car";
-                      const options = manufacturers.data?.[type] || [];
-                      return options.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ));
-                    })()}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                </div>
+                <Controller
+                  control={control}
+                  name="manufacturer"
+                  render={({ field }) => {
+                    const type = useWatch({ control, name: "vehicleType" }) || "Car";
+                    const options = manufacturers.data?.[type] || [];
+                    return (
+                      <Combobox
+                        options={options}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder={manufacturers.isLoading ? "Loading manufacturers..." : "Select Manufacturer..."}
+                        disabled={manufacturers.isLoading}
+                        className={inputClass(!!errors.manufacturer)}
+                      />
+                    );
+                  }}
+                />
               </Field>
 
               <Field label="Vehicle Model" error={errors.model?.message}>
@@ -211,9 +219,13 @@ export default function CreateJobPage() {
                 error={errors.vehicleNumber?.message}
               >
                 <input
-                  {...register("vehicleNumber")}
+                  {...register("vehicleNumber", {
+                    onChange: (e) => {
+                      e.target.value = e.target.value.toUpperCase();
+                    },
+                  })}
                   placeholder="E.G. LHR-1234"
-                  className={inputClass(!!errors.vehicleNumber)}
+                  className={cn(inputClass(!!errors.vehicleNumber), "uppercase")}
                 />
               </Field>
 
@@ -302,7 +314,7 @@ export default function CreateJobPage() {
               </div>
               <button
                 type="button"
-                onClick={() => append({ name: "", qty: 1, rate: 0 })}
+                onClick={() => append({ name: "", qty: 1, rate: 0, isTaxable: true })}
                 className="inline-flex items-center gap-1 text-sm font-semibold text-theme-accent transition-colors hover:text-theme-accent-dark"
               >
                 <Plus className="h-4 w-4" /> Add Item
@@ -310,84 +322,113 @@ export default function CreateJobPage() {
             </div>
 
             <div className="p-5">
-              <div className="overflow-x-auto">
-              <div className="min-w-[440px]">
-              {/* Column headers */}
-              <div className="grid grid-cols-[1fr_64px_96px_104px_32px] items-center gap-2 border-b border-gray-200 pb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                <span>Service / Part</span>
-                <span className="text-center">Qty</span>
-                <span className="text-center">Rate (INR)</span>
-                <span className="text-right">Amount</span>
-                <span />
-              </div>
+              <div className="w-full">
+                {/* Column headers */}
+                <div className="hidden md:grid md:grid-cols-[1fr_64px_96px_40px_104px_32px] items-center gap-2 border-b border-gray-200 pb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                  <span>Service / Part</span>
+                  <span className="text-center">Qty</span>
+                  <span className="text-center">Rate (INR)</span>
+                  <span className="text-center">Tax</span>
+                  <span className="text-right">Amount</span>
+                  <span />
+                </div>
 
-              <div className="divide-y divide-gray-100">
-                {fields.map((field, index) => {
-                  const qty = Number(watchedServices[index]?.qty) || 0;
-                  const rate = Number(watchedServices[index]?.rate) || 0;
-                  const amount = qty * rate;
-                  const rowError = errors.services?.[index];
-                  return (
-                    <div
-                      key={field.id}
-                      className="grid grid-cols-[1fr_64px_96px_104px_32px] items-center gap-2 py-3"
-                    >
-                      <div className="relative">
-                        <select
-                          {...register(`services.${index}.name` as const)}
-                          defaultValue={field.name || ""}
-                          disabled={services.isLoading}
-                          className={cn(
-                            inputClass(!!rowError?.name),
-                            "appearance-none pr-8",
-                          )}
-                        >
-                          <option value="" disabled>
-                            {services.isLoading
-                              ? "Loading services..."
-                              : "Select service / part..."}
-                          </option>
-                          {(services.data ?? []).map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                      </div>
-                      <input
-                        type="number"
-                        min={1}
-                        {...register(`services.${index}.qty` as const, {
-                          valueAsNumber: true,
-                        })}
-                        className={cn(inputClass(!!rowError?.qty), "text-center")}
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        {...register(`services.${index}.rate` as const, {
-                          valueAsNumber: true,
-                        })}
-                        className={cn(inputClass(!!rowError?.rate), "text-center")}
-                      />
-                      <span className="text-right text-sm font-medium text-gray-900 tabular-nums">
-                        {formatCurrency(amount)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => remove(index)}
-                        disabled={fields.length === 1}
-                        className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-theme-accent-soft hover:text-theme-accent disabled:cursor-not-allowed disabled:opacity-40"
+                <div className="divide-y divide-gray-100">
+                  {fields.map((field, index) => {
+                    const qty = Number(watchedServices[index]?.qty) || 0;
+                    const rate = Number(watchedServices[index]?.rate) || 0;
+                    const amount = qty * rate;
+                    const rowError = errors.services?.[index];
+                    return (
+                      <div
+                        key={field.id}
+                        className="flex flex-col gap-4 py-4 md:grid md:grid-cols-[1fr_64px_96px_40px_104px_32px] md:items-center md:gap-2 md:py-3"
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-              </div>
+                        <div className="w-full">
+                          <span className="mb-1.5 block text-[10px] font-semibold uppercase text-gray-500 md:hidden">
+                            Service / Part
+                          </span>
+                          <Controller
+                            control={control}
+                            name={`services.${index}.name` as const}
+                            render={({ field: nameField }) => (
+                              <Combobox
+                                options={services.data ?? []}
+                                value={nameField.value}
+                                onChange={nameField.onChange}
+                                placeholder={services.isLoading ? "Loading..." : "Select service / part..."}
+                                disabled={services.isLoading}
+                                className={inputClass(!!rowError?.name)}
+                              />
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3 md:contents">
+                          <div>
+                            <span className="mb-1.5 block text-[10px] font-semibold uppercase text-gray-500 md:hidden">
+                              Qty
+                            </span>
+                            <input
+                              type="number"
+                              min={1}
+                              {...register(`services.${index}.qty` as const, {
+                                valueAsNumber: true,
+                              })}
+                              className={cn(inputClass(!!rowError?.qty), "text-center")}
+                            />
+                          </div>
+                          <div>
+                            <span className="mb-1.5 block text-[10px] font-semibold uppercase text-gray-500 md:hidden">
+                              Rate
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              {...register(`services.${index}.rate` as const, {
+                                valueAsNumber: true,
+                              })}
+                              onFocus={(e) => e.target.select()}
+                              className={cn(inputClass(!!rowError?.rate), "text-center")}
+                            />
+                          </div>
+                          <div className="flex flex-col items-center">
+                            <span className="mb-1.5 block text-[10px] font-semibold uppercase text-gray-500 md:hidden">
+                              Tax
+                            </span>
+                            <div className="flex h-9 items-center justify-center md:h-auto">
+                              <input
+                                type="checkbox"
+                                {...register(`services.${index}.isTaxable` as const)}
+                                className="h-4 w-4 rounded border-gray-300 text-theme-accent focus:ring-theme-accent cursor-pointer"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-gray-100 pt-3 md:contents md:border-0 md:pt-0">
+                          <div className="flex items-center gap-2 md:contents">
+                            <span className="text-[10px] font-semibold uppercase text-gray-500 md:hidden">
+                              Amount:
+                            </span>
+                            <span className="text-sm font-semibold text-gray-900 tabular-nums md:text-right md:font-medium">
+                              {formatCurrency(amount)}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => remove(index)}
+                            disabled={fields.length === 1}
+                            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-theme-accent-soft hover:text-theme-accent disabled:cursor-not-allowed disabled:opacity-40 md:ml-auto"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {typeof errors.services?.message === "string" && (
@@ -402,8 +443,14 @@ export default function CreateJobPage() {
                   <span>Subtotal</span>
                   <span className="tabular-nums">{formatCurrency(subtotal)}</span>
                 </div>
+                {subtotalData.nonTaxable > 0 && (
+                  <div className="flex items-center justify-between text-gray-500 text-xs">
+                    <span>Includes Non-Taxable</span>
+                    <span className="tabular-nums">{formatCurrency(subtotalData.nonTaxable)}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-gray-600">
-                  <span>GST (18%)</span>
+                  <span>GST (18% on {formatCurrency(subtotalData.taxable)})</span>
                   <span className="tabular-nums">{formatCurrency(gst)}</span>
                 </div>
                 <div className="flex items-center justify-between border-t border-gray-200 pt-2 text-base font-bold text-gray-900">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Plus, MoreVertical, ChevronLeft, ChevronRight, Edit, Trash } from "lucide-react";
 import { useJobs, useDeleteJob } from "@/lib/hooks";
@@ -237,7 +237,9 @@ function JobCardMobile({ job }: { job: Job }) {
 
 export default function JobsPage() {
   const [tab, setTab] = useState<TabValue>("all");
-  const { data: jobs, isLoading, isError, error } = useJobs({ status: tab });
+  const searchParams = useSearchParams();
+  const search = searchParams.get("search") || undefined;
+  const { data: jobs, isLoading, isError, error } = useJobs({ status: tab, search });
 
   const rows = jobs ?? [];
 
