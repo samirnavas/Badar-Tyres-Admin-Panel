@@ -1,13 +1,17 @@
+"use server";
+
 import type { User } from "../models/User";
-import { mockUsers } from "../mock_db";
+import { readData } from "../db";
 import { simulateLatency } from "./delay";
+
+const FILE_NAME = "users.json";
 
 /**
  * Returns all users.
  */
 export async function getUsers(): Promise<User[]> {
   await simulateLatency();
-  return [...mockUsers];
+  return readData<User[]>(FILE_NAME);
 }
 
 /**
@@ -15,7 +19,8 @@ export async function getUsers(): Promise<User[]> {
  */
 export async function getUserById(id: string): Promise<User | null> {
   await simulateLatency();
-  return mockUsers.find((user) => user.id === id) ?? null;
+  const users = await readData<User[]>(FILE_NAME);
+  return users.find((user) => user.id === id) ?? null;
 }
 
 /**
@@ -24,5 +29,6 @@ export async function getUserById(id: string): Promise<User | null> {
  */
 export async function getTechnicians(): Promise<User[]> {
   await simulateLatency();
-  return mockUsers.filter((user) => user.role === "technician");
+  const users = await readData<User[]>(FILE_NAME);
+  return users.filter((user) => user.role === "technician");
 }

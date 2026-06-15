@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --color-theme-accent: #ae2f31;
-  --color-theme-accent-dark: #8f2627;
-  --color-theme-accent-soft: #fbeaea;
+  --color-theme-accent: var(--color-red-600);
+  --color-theme-accent-dark: var(--color-red-700);
+  --color-theme-accent-soft: var(--color-red-50);
   --color-canvas: #f9fafb;
 
   --font-sans: var(--font-hanken-grotesk), ui-sans-serif, system-ui, sans-serif;

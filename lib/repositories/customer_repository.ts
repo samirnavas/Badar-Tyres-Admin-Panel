@@ -1,14 +1,18 @@
+"use server";
+
 import type { Customer } from "../models/Customer";
-import { mockCustomers } from "../mock_db";
+import { readData, writeData } from "../db";
 import { generateId } from "../generateId";
 import { simulateLatency } from "./delay";
+
+const FILE_NAME = "customers.json";
 
 /**
  * Returns all customers.
  */
 export async function getCustomers(): Promise<Customer[]> {
   await simulateLatency();
-  return [...mockCustomers];
+  return readData<Customer[]>(FILE_NAME);
 }
 
 /**
@@ -16,13 +20,12 @@ export async function getCustomers(): Promise<Customer[]> {
  */
 export async function getCustomerById(id: string): Promise<Customer | null> {
   await simulateLatency();
-  return mockCustomers.find((customer) => customer.id === id) ?? null;
+  const customers = await readData<Customer[]>(FILE_NAME);
+  return customers.find((customer) => customer.id === id) ?? null;
 }
 
 /**
- * Simulates creating a new customer: generates a mock UUID, stamps
- * created_at with the current time, persists it to the mock array, and
- * returns the saved record.
+ * Creates a new customer, persists it to the JSON file, and returns it.
  */
 export async function createCustomer(
   data: Omit<Customer, "id" | "created_at">,
@@ -35,6 +38,9 @@ export async function createCustomer(
     created_at: new Date().toISOString(),
   };
 
-  mockCustomers.push(customer);
+  const customers = await readData<Customer[]>(FILE_NAME);
+  customers.push(customer);
+  await writeData(FILE_NAME, customers);
+
   return customer;
 }

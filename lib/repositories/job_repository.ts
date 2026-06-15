@@ -1,9 +1,15 @@
+"use server";
+
 import type { JobCard } from "../models/JobCard";
 import type { Customer } from "../models/Customer";
 import type { Vehicle } from "../models/Vehicle";
-import { mockJobCards, mockCustomers, mockVehicles } from "../mock_db";
+import { readData, writeData } from "../db";
 import { generateId } from "../generateId";
 import { simulateLatency } from "./delay";
+
+const FILE_NAME = "jobs.json";
+const CUSTOMERS_FILE = "customers.json";
+const VEHICLES_FILE = "vehicles.json";
 
 /**
  * A JobCard with its related Customer and Vehicle records joined in.
@@ -28,7 +34,7 @@ export type CreateJobCardInput = Omit<
  */
 export async function getJobCards(): Promise<JobCard[]> {
   await simulateLatency();
-  return [...mockJobCards];
+  return readData<JobCard[]>(FILE_NAME);
 }
 
 /**
@@ -39,7 +45,8 @@ export async function getJobCardsByCustomerId(
   customerId: string,
 ): Promise<JobCard[]> {
   await simulateLatency();
-  return mockJobCards
+  const jobs = await readData<JobCard[]>(FILE_NAME);
+  return jobs
     .filter((job) => job.customer_id === customerId)
     .sort(
       (a, b) =>
@@ -56,18 +63,21 @@ export async function getJobCardById(
 ): Promise<JobCardWithRelations | null> {
   await simulateLatency();
 
-  const jobCard = mockJobCards.find((job) => job.id === id);
+  const jobs = await readData<JobCard[]>(FILE_NAME);
+  const jobCard = jobs.find((job) => job.id === id);
   if (!jobCard) return null;
 
-  const customer =
-    mockCustomers.find((c) => c.id === jobCard.customer_id) ?? null;
-  const vehicle = mockVehicles.find((v) => v.id === jobCard.vehicle_id) ?? null;
+  const customers = await readData<Customer[]>(CUSTOMERS_FILE);
+  const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
+
+  const customer = customers.find((c) => c.id === jobCard.customer_id) ?? null;
+  const vehicle = vehicles.find((v) => v.id === jobCard.vehicle_id) ?? null;
 
   return { ...jobCard, customer, vehicle };
 }
 
 /**
- * Simulates creating a new job card and returns the persisted record.
+ * Creates a new job card and returns the persisted record.
  *
  * Security: the `created_by` field (referencing the acting User.id) is
  * mandatory for the audit trail. Creation is rejected when it is missing,
@@ -96,6 +106,77 @@ export async function createJobCard(
     updated_at: now,
   };
 
-  mockJobCards.push(jobCard);
+  const jobs = await readData<JobCard[]>(FILE_NAME);
+  jobs.push(jobCard);
+  await writeData(FILE_NAME, jobs);
+
   return jobCard;
+}
+
+/**
+ * Updates a job card's status and calculates next service date if completed/invoiced.
+ */
+export async function updateJobStatus(
+  jobId: string,
+  newStatus: string,
+): Promise<JobCardWithRelations | null> {
+  await simulateLatency();
+
+  const jobs = await readData<JobCard[]>(FILE_NAME);
+  const jobIndex = jobs.findIndex((job) => job.id === jobId);
+  if (jobIndex === -1) return null;
+
+  const jobCard = jobs[jobIndex];
+  jobCard.status = newStatus as any;
+  jobCard.updated_at = new Date().toISOString();
+
+  const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
+  const vehicleIndex = vehicles.findIndex((v) => v.id === jobCard.vehicle_id);
+  
+  // Smart Service Interval Calculation
+  if (newStatus === "Completed" || newStatus === "Invoiced") {
+    if (vehicleIndex !== -1) {
+      const vehicle = vehicles[vehicleIndex];
+      const nextServiceDate = new Date();
+      nextServiceDate.setDate(nextServiceDate.getDate() + 180);
+      vehicle.next_service_date = nextServiceDate.toISOString();
+      await writeData(VEHICLES_FILE, vehicles);
+    }
+  }
+
+  await writeData(FILE_NAME, jobs);
+
+  const customers = await readData<Customer[]>(CUSTOMERS_FILE);
+  const customer = customers.find((c) => c.id === jobCard.customer_id) ?? null;
+  const vehicle = vehicleIndex !== -1 ? vehicles[vehicleIndex] : null;
+
+  return { ...jobCard, customer, vehicle };
+}
+
+/**
+ * Calculates key metrics for the dashboard.
+ */
+export async function getDashboardMetrics() {
+  await simulateLatency();
+
+  const jobs = await readData<JobCard[]>(FILE_NAME);
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  let todaysRevenue = 0;
+  let pendingJobs = 0;
+  let completedJobs = 0;
+
+  for (const job of jobs) {
+    if (job.status === "Draft" || job.status === "In Progress") {
+      pendingJobs++;
+    } else if (job.status === "Completed" || job.status === "Invoiced") {
+      completedJobs++;
+    }
+
+    if (job.status === "Invoiced" && job.created_at.startsWith(todayStr)) {
+      todaysRevenue += job.total_amount;
+    }
+  }
+
+  return { todaysRevenue, pendingJobs, completedJobs };
 }

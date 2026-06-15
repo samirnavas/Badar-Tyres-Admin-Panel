@@ -1,14 +1,18 @@
+"use server";
+
 import type { Vehicle } from "../models/Vehicle";
-import { mockVehicles } from "../mock_db";
+import { readData, writeData } from "../db";
 import { generateId } from "../generateId";
 import { simulateLatency } from "./delay";
+
+const FILE_NAME = "vehicles.json";
 
 /**
  * Returns all vehicles.
  */
 export async function getVehicles(): Promise<Vehicle[]> {
   await simulateLatency();
-  return [...mockVehicles];
+  return readData<Vehicle[]>(FILE_NAME);
 }
 
 /**
@@ -16,7 +20,8 @@ export async function getVehicles(): Promise<Vehicle[]> {
  */
 export async function getVehicleById(id: string): Promise<Vehicle | null> {
   await simulateLatency();
-  return mockVehicles.find((vehicle) => vehicle.id === id) ?? null;
+  const vehicles = await readData<Vehicle[]>(FILE_NAME);
+  return vehicles.find((vehicle) => vehicle.id === id) ?? null;
 }
 
 /**
@@ -27,12 +32,12 @@ export async function getVehiclesByCustomerId(
   customerId: string,
 ): Promise<Vehicle[]> {
   await simulateLatency();
-  return mockVehicles.filter((vehicle) => vehicle.customer_id === customerId);
+  const vehicles = await readData<Vehicle[]>(FILE_NAME);
+  return vehicles.filter((vehicle) => vehicle.customer_id === customerId);
 }
 
 /**
- * Simulates creating a new vehicle: generates a mock id, persists it to the
- * mock array, and returns the saved record.
+ * Creates a new vehicle, persists it to the JSON file, and returns it.
  */
 export async function createVehicle(
   data: Omit<Vehicle, "id">,
@@ -40,6 +45,9 @@ export async function createVehicle(
   await simulateLatency();
 
   const vehicle: Vehicle = { ...data, id: generateId() };
-  mockVehicles.push(vehicle);
+  const vehicles = await readData<Vehicle[]>(FILE_NAME);
+  vehicles.push(vehicle);
+  await writeData(FILE_NAME, vehicles);
+
   return vehicle;
 }

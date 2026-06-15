@@ -11,7 +11,9 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
-import { useMetrics, useJobs } from "@/lib/hooks";
+import { useJobs } from "@/lib/hooks";
+import { useQuery } from "@tanstack/react-query";
+import { getDashboardMetrics } from "@/lib/repositories";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { UpcomingServicesWidget } from "@/components/dashboard/UpcomingServicesWidget";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -20,13 +22,14 @@ import { formatCurrency, cn } from "@/lib/format";
 import type { Job } from "@/lib/types";
 
 export default function DashboardPage() {
-  const metrics = useMetrics();
   const jobs = useJobs();
+  
+  const dashboardMetricsQuery = useQuery({
+    queryKey: ["dashboardMetrics"],
+    queryFn: getDashboardMetrics,
+  });
 
-  const m = metrics.data;
   const recent = (jobs.data ?? []).slice(0, 5);
-  const runningProgress =
-    m && m.totalJobs > 0 ? (m.running / m.totalJobs) * 100 : 0;
 
   const activeJobs = (jobs.data ?? []).filter((j) => j.status === "running");
   const blockedJobs = (jobs.data ?? []).filter((j) => j.status === "delayed");
@@ -57,48 +60,24 @@ export default function DashboardPage() {
       </div>
 
       {/* Metric cards */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MetricCard
-          label="Total Jobs"
-          value={m?.totalJobs ?? 0}
-          icon={LayoutGrid}
-          loading={metrics.isLoading}
-          caption={
-            <span className="flex items-center gap-0.5 text-xs font-semibold text-emerald-600">
-              <TrendingUp className="h-3 w-3" /> 12%
-            </span>
-          }
+          label="Today's Revenue"
+          value={`₹${formatCurrency(dashboardMetricsQuery.data?.todaysRevenue ?? 0)}`}
+          icon={TrendingUp}
+          loading={dashboardMetricsQuery.isLoading}
         />
         <MetricCard
-          label="Running"
-          value={m?.running ?? 0}
-          icon={RefreshCw}
-          loading={metrics.isLoading}
-          progress={runningProgress}
-        />
-        <MetricCard
-          label="Completed"
-          value={m?.completed ?? 0}
-          icon={CheckCircle2}
-          loading={metrics.isLoading}
-        />
-        <MetricCard
-          label="Delayed"
-          value={m?.delayed ?? 0}
-          icon={AlertTriangle}
-          accent
-          loading={metrics.isLoading}
-          caption={
-            <span className="text-xs font-semibold text-theme-accent">
-              Critical
-            </span>
-          }
-        />
-        <MetricCard
-          label="Pending"
-          value={m?.pending ?? 0}
+          label="Pending Jobs"
+          value={dashboardMetricsQuery.data?.pendingJobs ?? 0}
           icon={Clock}
-          loading={metrics.isLoading}
+          loading={dashboardMetricsQuery.isLoading}
+        />
+        <MetricCard
+          label="Completed Jobs"
+          value={dashboardMetricsQuery.data?.completedJobs ?? 0}
+          icon={CheckCircle2}
+          loading={dashboardMetricsQuery.isLoading}
         />
       </div>
 

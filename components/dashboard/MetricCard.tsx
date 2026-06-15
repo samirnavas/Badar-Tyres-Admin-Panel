@@ -40,7 +40,7 @@ export function MetricCard({
         <Icon
           className={cn(
             "h-4 w-4",
-            accent ? "text-theme-accent" : "text-gray-400",
+            "text-theme-accent",
           )}
         />
       </div>

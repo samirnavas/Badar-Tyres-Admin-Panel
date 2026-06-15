@@ -224,9 +224,9 @@ export const mockJobCards: JobCard[] = [
 
 export const mockShopSettings: ShopSettings = {
   shop_name: "Badar Tyres & Auto Care",
-  shop_address: "12 Marine Drive, Kochi, Kerala 682031",
-  contact_phone: "+91 98400 00000",
-  contact_email: "support@badartyres.com",
+  shop_address: "Wayanad Road, Koduvally, Kozhikode",
+  contact_phone: "+919188954101",
+  contact_email: "info@badartyres.com",
   default_gst_rate: 18,
   terms_and_conditions:
     "1. All services carry a warranty as noted on the job card.\n2. Goods once sold are not returnable.\n3. Payment is due on completion of work.\n4. Vehicles left beyond 7 days of completion may incur storage charges.",

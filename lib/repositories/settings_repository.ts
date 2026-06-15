@@ -1,17 +1,17 @@
+"use server";
+
 import type { ShopSettings } from "../models/ShopSettings";
-import { mockShopSettings } from "../mock_db";
+import { readData, writeData } from "../db";
 import { simulateLatency } from "./delay";
 
-// Held in a mutable module-level object so updateSettings persists across
-// calls for the lifetime of the session, mimicking a single settings row.
-let currentSettings: ShopSettings = { ...mockShopSettings };
+const FILE_NAME = "settings.json";
 
 /**
  * Returns the shop's global settings.
  */
 export async function getSettings(): Promise<ShopSettings> {
   await simulateLatency();
-  return { ...currentSettings };
+  return readData<ShopSettings>(FILE_NAME);
 }
 
 /**
@@ -21,6 +21,6 @@ export async function updateSettings(
   data: ShopSettings,
 ): Promise<ShopSettings> {
   await simulateLatency();
-  currentSettings = { ...data };
-  return { ...currentSettings };
+  await writeData(FILE_NAME, data);
+  return { ...data };
 }

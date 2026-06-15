@@ -25,7 +25,7 @@ export const createJobCardSchema = z
       .min(1, "Add at least one service item"),
   })
   .superRefine((data, ctx) => {
-    if (data.is_new_vehicle) {
+    if (!data.vehicle_id) {
       if (!data.vehicleType)
         ctx.addIssue({
           code: "custom",
@@ -50,12 +50,6 @@ export const createJobCardSchema = z
           path: ["registration_number"],
           message: "Registration is required",
         });
-    } else if (!data.vehicle_id) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["vehicle_id"],
-        message: "Select a vehicle",
-      });
     }
   });
 

@@ -147,7 +147,7 @@ function CreateJobForm() {
           manufacturer: values.manufacturer ?? "",
           model: values.model ?? "",
           registration_number: values.registration_number ?? "",
-          next_service_date: "",
+          next_service_date: null,
         });
         vehicleId = newVehicle.id;
       }
@@ -171,6 +171,7 @@ function CreateJobForm() {
       queryClient.invalidateQueries({ queryKey: ["job-cards"] });
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
       queryClient.invalidateQueries({ queryKey: ["vehicles-by-customer"] });
+      router.refresh();
     },
   });
 
@@ -747,9 +748,11 @@ function CreateJobForm() {
       open={quickAddName !== null}
       initialName={quickAddName ?? ""}
       onClose={() => setQuickAddName(null)}
-      onCreated={(customer) => {
+      onSuccess={(newId) => {
         setQuickAddName(null);
-        handleCustomerChange(customer.id);
+        setValue('customer_id', newId, { shouldValidate: true });
+        // Also trigger the cascading reset so vehicle fields start fresh for the new customer.
+        handleCustomerChange(newId);
       }}
     />
   </>

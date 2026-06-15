@@ -7,5 +7,5 @@ export interface Vehicle {
   manufacturer: string;
   model: string;
   registration_number: string;
-  next_service_date: string;
+  next_service_date: string | null;
 }
