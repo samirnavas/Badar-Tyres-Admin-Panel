@@ -3,6 +3,7 @@ import type { Customer } from "./models/Customer";
 import type { Vehicle } from "./models/Vehicle";
 import type { Service } from "./models/Service";
 import type { JobCard } from "./models/JobCard";
+import type { ShopSettings } from "./models/ShopSettings";
 
 /**
  * In-memory mock database for the Admin Panel.
@@ -220,3 +221,13 @@ export const mockJobCards: JobCard[] = [
     updated_at: "2026-06-14T14:20:00.000Z",
   },
 ];
+
+export const mockShopSettings: ShopSettings = {
+  shop_name: "Badar Tyres & Auto Care",
+  shop_address: "12 Marine Drive, Kochi, Kerala 682031",
+  contact_phone: "+91 98400 00000",
+  contact_email: "support@badartyres.com",
+  default_gst_rate: 18,
+  terms_and_conditions:
+    "1. All services carry a warranty as noted on the job card.\n2. Goods once sold are not returnable.\n3. Payment is due on completion of work.\n4. Vehicles left beyond 7 days of completion may incur storage charges.",
+};

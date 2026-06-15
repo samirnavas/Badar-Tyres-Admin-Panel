@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   useForm,
   useFieldArray,
@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   CarFront,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import {
   getCustomers,
@@ -26,13 +27,15 @@ import {
   getServices,
   getTechnicians,
   createJobCard,
-  type CreateJobCardInput,
+  createVehicle,
 } from "@/lib/repositories";
+import type { VehicleType } from "@/lib/models/Vehicle";
 import { useManufacturers } from "@/lib/hooks";
 import { useAuth } from "@/lib/AuthContext";
 import { cn, formatCurrency } from "@/lib/format";
 import { createJobCardSchema, type CreateJobCardForm } from "./schema";
 import { Combobox, type ComboboxOption } from "@/components/ui/Combobox";
+import { CustomerFormModal } from "@/components/customers/CustomerFormModal";
 
 const VEHICLE_TYPES = ["Car", "Bike", "Others"] as const;
 
@@ -76,6 +79,7 @@ function CreateJobForm() {
     resolver: zodResolver(createJobCardSchema),
     defaultValues: {
       customer_id: presetCustomerId,
+      is_new_vehicle: false,
       vehicle_id: "",
       vehicleType: "",
       manufacturer: "",
@@ -95,7 +99,11 @@ function CreateJobForm() {
 
   const customerId = useWatch({ control, name: "customer_id" });
   const vehicleType = useWatch({ control, name: "vehicleType" });
+  const isAddingNewVehicle = useWatch({ control, name: "is_new_vehicle" });
   const watchedServices = useWatch({ control, name: "services" }) ?? [];
+
+  // Holds the search term for the inline "quick add customer" modal; null when closed.
+  const [quickAddName, setQuickAddName] = useState<string | null>(null);
 
   // Relational lookup: only fetch vehicles once a customer is chosen.
   const vehiclesQuery = useQuery({
@@ -104,11 +112,65 @@ function CreateJobForm() {
     enabled: !!customerId,
   });
 
+  const hasExistingVehicles = (vehiclesQuery.data ?? []).length > 0;
+
+  // Zero-vehicle override: when the selected customer has no vehicles on file,
+  // there is nothing to select — force the manual entry view.
+  useEffect(() => {
+    if (!customerId || vehiclesQuery.isLoading || vehiclesQuery.isFetching)
+      return;
+    if (!hasExistingVehicles) {
+      setValue("is_new_vehicle", true);
+    }
+  }, [
+    customerId,
+    hasExistingVehicles,
+    vehiclesQuery.isLoading,
+    vehiclesQuery.isFetching,
+    setValue,
+  ]);
+
   const createMutation = useMutation({
-    mutationFn: (input: CreateJobCardInput) => createJobCard(input),
+    mutationFn: async (input: {
+      values: CreateJobCardForm;
+      createdBy: string;
+    }) => {
+      const { values, createdBy } = input;
+
+      // Inline vehicle creation: persist the new Vehicle first, then attach
+      // its generated id to the job card.
+      let vehicleId = values.vehicle_id ?? "";
+      if (values.is_new_vehicle) {
+        const newVehicle = await createVehicle({
+          customer_id: values.customer_id,
+          type: (values.vehicleType as VehicleType) ?? "Car",
+          manufacturer: values.manufacturer ?? "",
+          model: values.model ?? "",
+          registration_number: values.registration_number ?? "",
+          next_service_date: "",
+        });
+        vehicleId = newVehicle.id;
+      }
+
+      return createJobCard({
+        customer_id: values.customer_id,
+        vehicle_id: vehicleId,
+        assigned_technician_id: values.assigned_technician_id,
+        status: "In Progress",
+        service_item_ids: values.services.map((s) => s.service_id),
+        subtotal: totals.subtotal,
+        total_tax: totals.tax,
+        total_amount: grandTotal,
+        warranty_end_date: values.warranty_end_date || null,
+        warranty_notes: values.warranty_notes || null,
+        created_by: createdBy,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["vehicles-by-customer"] });
     },
   });
 
@@ -171,9 +233,31 @@ function CreateJobForm() {
   const grandTotal = totals.subtotal + totals.tax;
 
   // Cascading reset: a new customer invalidates the vehicle and every
-  // field derived from it.
+  // field derived from it. Default back to "select" mode; the zero-vehicle
+  // effect flips to manual entry if the customer has nothing on file.
   const handleCustomerChange = (value: string) => {
     setValue("customer_id", value, { shouldValidate: true });
+    setValue("is_new_vehicle", false);
+    setValue("vehicle_id", "");
+    setValue("vehicleType", "");
+    setValue("manufacturer", "");
+    setValue("model", "");
+    setValue("registration_number", "");
+  };
+
+  // Switch into manual vehicle entry, clearing any prior selection.
+  const enterNewVehicleMode = () => {
+    setValue("is_new_vehicle", true);
+    setValue("vehicle_id", "");
+    setValue("vehicleType", "");
+    setValue("manufacturer", "");
+    setValue("model", "");
+    setValue("registration_number", "");
+  };
+
+  // Switch back to selecting an existing vehicle, clearing manual fields.
+  const exitNewVehicleMode = () => {
+    setValue("is_new_vehicle", false);
     setValue("vehicle_id", "");
     setValue("vehicleType", "");
     setValue("manufacturer", "");
@@ -225,26 +309,14 @@ function CreateJobForm() {
       return;
     }
 
-    const payload: CreateJobCardInput = {
-      customer_id: values.customer_id,
-      vehicle_id: values.vehicle_id,
-      assigned_technician_id: values.assigned_technician_id,
-      status: "In Progress",
-      service_item_ids: values.services.map((s) => s.service_id),
-      subtotal: totals.subtotal,
-      total_tax: totals.tax,
-      total_amount: grandTotal,
-      warranty_end_date: values.warranty_end_date || null,
-      warranty_notes: values.warranty_notes || null,
-      created_by: user.id,
-    };
-
-    createMutation.mutate(payload, {
-      onSuccess: () => router.push("/jobs"),
-    });
+    createMutation.mutate(
+      { values, createdBy: user.id },
+      { onSuccess: () => router.push("/jobs") },
+    );
   };
 
   return (
+   <>
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -285,6 +357,8 @@ function CreateJobForm() {
                       disabled={customersQuery.isLoading}
                       className={inputClass(!!errors.customer_id)}
                       emptyMessage="No customers found"
+                      onCreateNew={(term) => setQuickAddName(term)}
+                      createNewLabel={(term) => `Add "${term}" as new customer`}
                     />
                   )}
                 />
@@ -296,103 +370,139 @@ function CreateJobForm() {
               icon={<CarFront className="h-4 w-4" />}
               title="Vehicle Details"
             >
-              <Field label="Vehicle" error={errors.vehicle_id?.message}>
-                <Controller
-                  control={control}
-                  name="vehicle_id"
-                  render={({ field }) => (
-                    <Combobox
-                      options={vehicleOptions}
-                      value={field.value}
-                      onChange={handleVehicleChange}
-                      placeholder={
-                        !customerId
-                          ? "Select a customer first"
-                          : vehiclesQuery.isLoading
-                            ? "Loading vehicles..."
-                            : "Search vehicle..."
-                      }
-                      disabled={!customerId || vehiclesQuery.isLoading}
-                      className={inputClass(!!errors.vehicle_id)}
-                      emptyMessage="No vehicles for this customer"
+              {!isAddingNewVehicle ? (
+                <>
+                  <Field label="Vehicle" error={errors.vehicle_id?.message}>
+                    <Controller
+                      control={control}
+                      name="vehicle_id"
+                      render={({ field }) => (
+                        <Combobox
+                          options={vehicleOptions}
+                          value={field.value ?? ""}
+                          onChange={handleVehicleChange}
+                          placeholder={
+                            !customerId
+                              ? "Select a customer first"
+                              : vehiclesQuery.isLoading
+                                ? "Loading vehicles..."
+                                : "Search vehicle..."
+                          }
+                          disabled={!customerId || vehiclesQuery.isLoading}
+                          className={inputClass(!!errors.vehicle_id)}
+                          emptyMessage="No vehicles for this customer"
+                        />
+                      )}
                     />
-                  )}
-                />
-              </Field>
+                  </Field>
 
-              <Field label="Vehicle Type" error={errors.vehicleType?.message}>
-                <div className="flex gap-2">
-                  {VEHICLE_TYPES.map((type) => {
-                    const active = vehicleType === type;
-                    return (
+                  {customerId && (
+                    <button
+                      type="button"
+                      onClick={enterNewVehicleMode}
+                      className="inline-flex items-center gap-1 text-sm font-semibold text-theme-accent transition-colors hover:text-theme-accent-dark"
+                    >
+                      <Plus className="h-4 w-4" /> Add a different vehicle
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-gray-500">
+                      {hasExistingVehicles
+                        ? "Entering a new vehicle for this customer."
+                        : "No vehicles on file — add the customer's first vehicle."}
+                    </p>
+                    {hasExistingVehicles && (
                       <button
-                        key={type}
                         type="button"
-                        onClick={() => handleVehicleTypeChange(type)}
-                        className={cn(
-                          "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                          active
-                            ? "border-theme-accent bg-theme-accent text-white"
-                            : "border-gray-200 bg-white text-gray-600 hover:border-gray-300",
-                        )}
+                        onClick={exitNewVehicleMode}
+                        className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
                       >
-                        {type}
+                        <X className="h-4 w-4" /> Cancel
                       </button>
-                    );
-                  })}
-                </div>
-              </Field>
+                    )}
+                  </div>
 
-              <Field
-                label="Manufacturer"
-                error={errors.manufacturer?.message}
-              >
-                <Controller
-                  control={control}
-                  name="manufacturer"
-                  render={({ field }) => (
-                    <Combobox
-                      options={manufacturerOptions}
-                      value={field.value}
-                      onChange={field.onChange}
-                      placeholder={
-                        !vehicleType
-                          ? "Select a vehicle type first"
-                          : "Select manufacturer..."
-                      }
-                      disabled={!vehicleType || manufacturers.isLoading}
-                      className={inputClass(!!errors.manufacturer)}
-                      emptyMessage="No manufacturers"
+                  <Field
+                    label="Vehicle Type"
+                    error={errors.vehicleType?.message}
+                  >
+                    <div className="flex gap-2">
+                      {VEHICLE_TYPES.map((type) => {
+                        const active = vehicleType === type;
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => handleVehicleTypeChange(type)}
+                            className={cn(
+                              "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                              active
+                                ? "border-theme-accent bg-theme-accent text-white"
+                                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300",
+                            )}
+                          >
+                            {type}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </Field>
+
+                  <Field
+                    label="Manufacturer"
+                    error={errors.manufacturer?.message}
+                  >
+                    <Controller
+                      control={control}
+                      name="manufacturer"
+                      render={({ field }) => (
+                        <Combobox
+                          options={manufacturerOptions}
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          placeholder={
+                            !vehicleType
+                              ? "Select a vehicle type first"
+                              : "Select manufacturer..."
+                          }
+                          disabled={!vehicleType || manufacturers.isLoading}
+                          className={inputClass(!!errors.manufacturer)}
+                          emptyMessage="No manufacturers"
+                        />
+                      )}
                     />
-                  )}
-                />
-              </Field>
+                  </Field>
 
-              <Field label="Model" error={errors.model?.message}>
-                <input
-                  {...register("model")}
-                  placeholder="e.g. Innova Crysta"
-                  className={inputClass(!!errors.model)}
-                />
-              </Field>
+                  <Field label="Model" error={errors.model?.message}>
+                    <input
+                      {...register("model")}
+                      placeholder="e.g. Innova Crysta"
+                      className={inputClass(!!errors.model)}
+                    />
+                  </Field>
 
-              <Field
-                label="Registration Number"
-                error={errors.registration_number?.message}
-              >
-                <input
-                  {...register("registration_number", {
-                    onChange: (e) => {
-                      e.target.value = e.target.value.toUpperCase();
-                    },
-                  })}
-                  placeholder="E.G. KL-07-AB-1234"
-                  className={cn(
-                    inputClass(!!errors.registration_number),
-                    "uppercase",
-                  )}
-                />
-              </Field>
+                  <Field
+                    label="Registration Number"
+                    error={errors.registration_number?.message}
+                  >
+                    <input
+                      {...register("registration_number", {
+                        onChange: (e) => {
+                          e.target.value = e.target.value.toUpperCase();
+                        },
+                      })}
+                      placeholder="E.G. KL-07-AB-1234"
+                      className={cn(
+                        inputClass(!!errors.registration_number),
+                        "uppercase",
+                      )}
+                    />
+                  </Field>
+                </>
+              )}
             </Section>
 
             {/* Assignment */}
@@ -629,6 +739,20 @@ function CreateJobForm() {
         </div>
       </div>
     </form>
+
+    {/* Inline quick-add: create a customer without leaving the job form.
+        Rendered as a sibling (not a child) of the form so its submit event
+        never bubbles into the job form's onSubmit via the React tree. */}
+    <CustomerFormModal
+      open={quickAddName !== null}
+      initialName={quickAddName ?? ""}
+      onClose={() => setQuickAddName(null)}
+      onCreated={(customer) => {
+        setQuickAddName(null);
+        handleCustomerChange(customer.id);
+      }}
+    />
+  </>
   );
 }
 

@@ -2,6 +2,7 @@ import type { JobCard } from "../models/JobCard";
 import type { Customer } from "../models/Customer";
 import type { Vehicle } from "../models/Vehicle";
 import { mockJobCards, mockCustomers, mockVehicles } from "../mock_db";
+import { generateId } from "../generateId";
 import { simulateLatency } from "./delay";
 
 /**
@@ -90,7 +91,7 @@ export async function createJobCard(
   const now = new Date().toISOString();
   const jobCard: JobCard = {
     ...data,
-    id: crypto.randomUUID(),
+    id: generateId(),
     created_at: now,
     updated_at: now,
   };

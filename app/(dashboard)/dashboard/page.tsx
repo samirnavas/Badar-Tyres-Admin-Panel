@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { useMetrics, useJobs } from "@/lib/hooks";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { UpcomingServicesWidget } from "@/components/dashboard/UpcomingServicesWidget";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatCurrency, cn } from "@/lib/format";
@@ -200,50 +201,56 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Workshop Bay Queue */}
-        <section className="rounded-md border border-gray-200 bg-white">
-          <div className="border-b border-gray-200 px-5 py-4">
-            <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
-              <LayoutGrid className="h-4 w-4 text-theme-accent" />
-              Workshop Bay Queue
-            </h2>
-          </div>
+        {/* Side column */}
+        <div className="space-y-6">
+          {/* Upcoming Services & Notifications */}
+          <UpcomingServicesWidget />
 
-          <div className="space-y-5 p-5">
-            {jobs.isLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-20 w-full" />
-              ))
-            ) : (
-              <>
-                {activeJobs.slice(0, 2).map((job, i) => (
+          {/* Workshop Bay Queue */}
+          <section className="rounded-md border border-gray-200 bg-white">
+            <div className="border-b border-gray-200 px-5 py-4">
+              <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                <LayoutGrid className="h-4 w-4 text-theme-accent" />
+                Workshop Bay Queue
+              </h2>
+            </div>
+
+            <div className="space-y-5 p-5">
+              {jobs.isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))
+              ) : (
+                <>
+                  {activeJobs.slice(0, 2).map((job, i) => (
+                    <BaySlot
+                      key={job.id}
+                      bay={i + 1}
+                      state="active"
+                      title={`${job.customerName} (${job.jobNumber})`}
+                      subtitle={job.services[0]?.name ?? job.vehicleModel}
+                    />
+                  ))}
+                  {blockedJobs.slice(0, 1).map((job) => (
+                    <BaySlot
+                      key={job.id}
+                      bay={activeJobs.slice(0, 2).length + 1}
+                      state="blocked"
+                      title={`${job.customerName} (${job.jobNumber})`}
+                      subtitle={job.delay ? `Delayed · ${job.delay}` : "Awaiting parts delivery."}
+                    />
+                  ))}
                   <BaySlot
-                    key={job.id}
-                    bay={i + 1}
-                    state="active"
-                    title={`${job.customerName} (${job.jobNumber})`}
-                    subtitle={job.services[0]?.name ?? job.vehicleModel}
+                    bay={
+                      activeJobs.slice(0, 2).length + blockedJobs.slice(0, 1).length + 1
+                    }
+                    state="available"
                   />
-                ))}
-                {blockedJobs.slice(0, 1).map((job) => (
-                  <BaySlot
-                    key={job.id}
-                    bay={activeJobs.slice(0, 2).length + 1}
-                    state="blocked"
-                    title={`${job.customerName} (${job.jobNumber})`}
-                    subtitle={job.delay ? `Delayed · ${job.delay}` : "Awaiting parts delivery."}
-                  />
-                ))}
-                <BaySlot
-                  bay={
-                    activeJobs.slice(0, 2).length + blockedJobs.slice(0, 1).length + 1
-                  }
-                  state="available"
-                />
-              </>
-            )}
-          </div>
-        </section>
+                </>
+              )}
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );

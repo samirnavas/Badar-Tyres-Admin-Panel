@@ -1,5 +1,6 @@
 import type { Vehicle } from "../models/Vehicle";
 import { mockVehicles } from "../mock_db";
+import { generateId } from "../generateId";
 import { simulateLatency } from "./delay";
 
 /**
@@ -27,4 +28,18 @@ export async function getVehiclesByCustomerId(
 ): Promise<Vehicle[]> {
   await simulateLatency();
   return mockVehicles.filter((vehicle) => vehicle.customer_id === customerId);
+}
+
+/**
+ * Simulates creating a new vehicle: generates a mock id, persists it to the
+ * mock array, and returns the saved record.
+ */
+export async function createVehicle(
+  data: Omit<Vehicle, "id">,
+): Promise<Vehicle> {
+  await simulateLatency();
+
+  const vehicle: Vehicle = { ...data, id: generateId() };
+  mockVehicles.push(vehicle);
+  return vehicle;
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   Search,
@@ -25,6 +26,7 @@ import type { Customer } from "@/lib/models/Customer";
 import type { Vehicle } from "@/lib/models/Vehicle";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { CustomerFormModal } from "@/components/customers/CustomerFormModal";
 import {
   cn,
   formatCurrency,
@@ -44,12 +46,29 @@ function initials(name: string): string {
 }
 
 export default function CustomersPage() {
+  return (
+    <Suspense fallback={null}>
+      <CustomersView />
+    </Suspense>
+  );
+}
+
+function CustomersView() {
   const customersQuery = useQuery({
     queryKey: ["customers"],
     queryFn: getCustomers,
   });
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+
+  // Deep-link support: pre-select a customer when arriving with ?customer=<id>
+  // (e.g. from the dashboard "Upcoming Services" widget).
+  const customerParam = searchParams.get("customer");
+  useEffect(() => {
+    if (customerParam) setSelectedId(customerParam);
+  }, [customerParam]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -77,6 +96,12 @@ export default function CustomersPage() {
             Browse customer profiles, fleets, and service history.
           </p>
         </div>
+        <button
+          onClick={() => setAddOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-theme-accent px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-theme-accent-dark"
+        >
+          <Plus className="h-4 w-4" /> Add New Customer
+        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[340px_1fr]">
@@ -184,6 +209,12 @@ export default function CustomersPage() {
           />
         </div>
       )}
+
+      <CustomerFormModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onCreated={(customer) => setSelectedId(customer.id)}
+      />
     </div>
   );
 }

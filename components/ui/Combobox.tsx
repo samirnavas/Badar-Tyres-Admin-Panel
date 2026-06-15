@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { cn } from "@/lib/format";
 
 export interface ComboboxOption {
@@ -18,6 +18,8 @@ export function Combobox({
   className,
   disabled,
   emptyMessage = "No results found",
+  onCreateNew,
+  createNewLabel = (query: string) => `Add "${query}" as new`,
 }: {
   options: ComboboxOption[];
   value: string;
@@ -26,6 +28,9 @@ export function Combobox({
   className?: string;
   disabled?: boolean;
   emptyMessage?: string;
+  /** When provided and no result matches the query, shows a create CTA. */
+  onCreateNew?: (query: string) => void;
+  createNewLabel?: (query: string) => string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -137,7 +142,24 @@ export function Combobox({
             className="z-50 max-h-60 overflow-auto rounded-xl border border-white/40 bg-white/70 py-1 shadow-xl shadow-gray-900/10 backdrop-blur-xl backdrop-saturate-150 focus:outline-none [color-scheme:light]"
           >
             {filtered.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-gray-500">{emptyMessage}</li>
+              onCreateNew && query.trim() ? (
+                <li
+                  className="mx-1 flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-theme-accent transition-colors hover:bg-theme-accent-soft"
+                  onClick={() => {
+                    const term = query.trim();
+                    setQuery("");
+                    setOpen(false);
+                    onCreateNew(term);
+                  }}
+                >
+                  <Plus className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{createNewLabel(query.trim())}</span>
+                </li>
+              ) : (
+                <li className="px-3 py-2 text-sm text-gray-500">
+                  {emptyMessage}
+                </li>
+              )
             ) : (
               filtered.map((opt) => (
                 <li

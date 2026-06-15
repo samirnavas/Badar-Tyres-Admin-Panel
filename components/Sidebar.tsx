@@ -7,6 +7,7 @@ import {
   FileText,
   Truck,
   Users,
+  Settings,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/format";
@@ -16,6 +17,7 @@ const navItems = [
   { label: "Job Cards", href: "/jobs", icon: FileText },
   { label: "Vehicle Fleet Logs", href: "/vehicles", icon: Truck },
   { label: "Users Management", href: "/users", icon: Users },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar({
