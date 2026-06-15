@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -20,9 +20,17 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user, isInitialized } = useAuth();
   const [errorMsg, setErrorMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // If an authenticated admin lands on /login (e.g. after a refresh), send
+  // them straight to the dashboard.
+  useEffect(() => {
+    if (isInitialized && user?.role === "admin") {
+      router.replace("/dashboard");
+    }
+  }, [isInitialized, user, router]);
 
   const {
     register,
@@ -40,7 +48,7 @@ export default function LoginPage() {
         return;
       }
       login(data.token, data.user);
-      router.push("/");
+      router.replace("/dashboard");
     },
     onError: (err: Error) => {
       setErrorMsg(err.message || "Failed to login. Check your credentials.");
@@ -92,7 +100,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form method="POST" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* USER NAME */}
             <div>
               <label

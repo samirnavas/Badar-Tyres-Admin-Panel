@@ -1,34 +1,70 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useForm, useFieldArray, useWatch, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo } from "react";
 import {
-  User,
+  useForm,
+  useFieldArray,
+  useWatch,
+  Controller,
+} from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  User as UserIcon,
   Wrench,
   ClipboardCheck,
   Plus,
   Trash2,
   CheckCircle2,
-  ChevronDown,
   CarFront,
+  ShieldCheck,
 } from "lucide-react";
 import {
-  useTechnicians,
-  useManufacturers,
-  useServices,
-  useCreateJob,
-} from "@/lib/hooks";
+  getCustomers,
+  getVehiclesByCustomerId,
+  getServices,
+  getTechnicians,
+  createJobCard,
+  type CreateJobCardInput,
+} from "@/lib/repositories";
+import { useManufacturers } from "@/lib/hooks";
+import { useAuth } from "@/lib/AuthContext";
 import { cn, formatCurrency } from "@/lib/format";
-import { createJobSchema, type CreateJobForm, GST_RATE } from "./schema";
-import { Combobox } from "@/components/ui/Combobox";
+import { createJobCardSchema, type CreateJobCardForm } from "./schema";
+import { Combobox, type ComboboxOption } from "@/components/ui/Combobox";
+
+const VEHICLE_TYPES = ["Car", "Bike", "Others"] as const;
 
 export default function CreateJobPage() {
+  return (
+    <Suspense fallback={null}>
+      <CreateJobForm />
+    </Suspense>
+  );
+}
+
+function CreateJobForm() {
   const router = useRouter();
-  const technicians = useTechnicians();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const searchParams = useSearchParams();
+  // Pre-fill the customer when arriving from a CRM "Create New Job" action.
+  const presetCustomerId = searchParams.get("customer") ?? "";
+
+  const customersQuery = useQuery({
+    queryKey: ["customers"],
+    queryFn: getCustomers,
+  });
+  const servicesQuery = useQuery({
+    queryKey: ["service-catalog"],
+    queryFn: getServices,
+  });
+  const techniciansQuery = useQuery({
+    queryKey: ["technician-users"],
+    queryFn: getTechnicians,
+  });
   const manufacturers = useManufacturers();
-  const services = useServices();
-  const createJob = useCreateJob();
 
   const {
     register,
@@ -36,19 +72,19 @@ export default function CreateJobPage() {
     handleSubmit,
     setValue,
     formState: { errors },
-  } = useForm<CreateJobForm>({
-    resolver: zodResolver(createJobSchema),
+  } = useForm<CreateJobCardForm>({
+    resolver: zodResolver(createJobCardSchema),
     defaultValues: {
-      customerName: "",
-      mobile: "",
-      vehicleType: "Car",
-      wheelType: "",
-      tyreType: "",
+      customer_id: presetCustomerId,
+      vehicle_id: "",
+      vehicleType: "",
       manufacturer: "",
       model: "",
-      vehicleNumber: "",
-      technician: "",
-      services: [{ name: "", qty: 1, rate: 0, isTaxable: true }],
+      registration_number: "",
+      assigned_technician_id: "",
+      warranty_end_date: "",
+      warranty_notes: "",
+      services: [{ service_id: "", name: "", qty: 1, rate: 0, gst_rate: 18 }],
     },
   });
 
@@ -57,49 +93,155 @@ export default function CreateJobPage() {
     name: "services",
   });
 
+  const customerId = useWatch({ control, name: "customer_id" });
+  const vehicleType = useWatch({ control, name: "vehicleType" });
   const watchedServices = useWatch({ control, name: "services" }) ?? [];
 
-  const subtotalData = watchedServices.reduce(
+  // Relational lookup: only fetch vehicles once a customer is chosen.
+  const vehiclesQuery = useQuery({
+    queryKey: ["vehicles-by-customer", customerId],
+    queryFn: () => getVehiclesByCustomerId(customerId),
+    enabled: !!customerId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (input: CreateJobCardInput) => createJobCard(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+    },
+  });
+
+  const customerOptions: ComboboxOption[] = useMemo(
+    () =>
+      (customersQuery.data ?? []).map((c) => ({
+        value: c.id,
+        label: c.name,
+        hint: c.phone,
+      })),
+    [customersQuery.data],
+  );
+
+  const vehicleOptions: ComboboxOption[] = useMemo(
+    () =>
+      (vehiclesQuery.data ?? []).map((v) => ({
+        value: v.id,
+        label: `${v.manufacturer} ${v.model}`,
+        hint: v.registration_number,
+      })),
+    [vehiclesQuery.data],
+  );
+
+  const manufacturerOptions: ComboboxOption[] = useMemo(() => {
+    const list = vehicleType ? manufacturers.data?.[vehicleType] ?? [] : [];
+    return list.map((m) => ({ value: m, label: m }));
+  }, [manufacturers.data, vehicleType]);
+
+  const serviceOptions: ComboboxOption[] = useMemo(
+    () =>
+      (servicesQuery.data ?? []).map((s) => ({
+        value: s.id,
+        label: s.name,
+        hint: `₹${formatCurrency(s.price)}`,
+      })),
+    [servicesQuery.data],
+  );
+
+  const technicianOptions: ComboboxOption[] = useMemo(
+    () =>
+      (techniciansQuery.data ?? []).map((t) => ({
+        value: t.id,
+        label: t.name,
+      })),
+    [techniciansQuery.data],
+  );
+
+  const totals = watchedServices.reduce(
     (acc, s) => {
       const qty = Number(s?.qty) || 0;
       const rate = Number(s?.rate) || 0;
+      const gstRate = Number(s?.gst_rate) || 0;
       const amount = qty * rate;
-      if (s?.isTaxable !== false) {
-        acc.taxable += amount;
-      } else {
-        acc.nonTaxable += amount;
-      }
-      acc.total += amount;
+      acc.subtotal += amount;
+      acc.tax += (amount * gstRate) / 100;
       return acc;
     },
-    { taxable: 0, nonTaxable: 0, total: 0 }
+    { subtotal: 0, tax: 0 },
   );
+  const grandTotal = totals.subtotal + totals.tax;
 
-  const subtotal = subtotalData.total;
-  const gst = subtotalData.taxable * GST_RATE;
-  const grandTotal = subtotal + gst;
+  // Cascading reset: a new customer invalidates the vehicle and every
+  // field derived from it.
+  const handleCustomerChange = (value: string) => {
+    setValue("customer_id", value, { shouldValidate: true });
+    setValue("vehicle_id", "");
+    setValue("vehicleType", "");
+    setValue("manufacturer", "");
+    setValue("model", "");
+    setValue("registration_number", "");
+  };
 
-  const onSubmit = (values: CreateJobForm) => {
-    createJob.mutate(
-      {
-        customerName: values.customerName,
-        mobile: values.mobile,
-        vehicleType: values.vehicleType,
-        wheelType: values.wheelType,
-        tyreType: values.tyreType,
-        vehicleModel: `${values.manufacturer} ${values.model}`.trim(),
-        vehicleNumber: values.vehicleNumber,
-        technician: values.technician,
-        services: values.services.map((s) => ({
-          name: s.name,
-          description: `${s.qty} × ₹${formatCurrency(s.rate)}`,
-          amount: s.qty * s.rate,
-        })),
-      },
-      {
-        onSuccess: () => router.push("/jobs"),
-      },
-    );
+  // Selecting a vehicle hydrates the dependent vehicle-detail fields.
+  const handleVehicleChange = (value: string) => {
+    setValue("vehicle_id", value, { shouldValidate: true });
+    const vehicle = (vehiclesQuery.data ?? []).find((v) => v.id === value);
+    if (vehicle) {
+      setValue("vehicleType", vehicle.type, { shouldValidate: true });
+      setValue("manufacturer", vehicle.manufacturer, { shouldValidate: true });
+      setValue("model", vehicle.model, { shouldValidate: true });
+      setValue("registration_number", vehicle.registration_number, {
+        shouldValidate: true,
+      });
+    }
+  };
+
+  // Cascading reset: changing the vehicle type clears type-specific fields.
+  const handleVehicleTypeChange = (value: string) => {
+    setValue("vehicleType", value, { shouldValidate: true });
+    setValue("manufacturer", "");
+    setValue("model", "");
+  };
+
+  const handleServiceChange = (index: number, serviceId: string) => {
+    setValue(`services.${index}.service_id`, serviceId, {
+      shouldValidate: true,
+    });
+    const service = (servicesQuery.data ?? []).find((s) => s.id === serviceId);
+    if (service) {
+      setValue(`services.${index}.name`, service.name);
+      setValue(`services.${index}.rate`, service.price);
+      setValue(`services.${index}.gst_rate`, service.gst_rate);
+    }
+  };
+
+  const onSubmit = (values: CreateJobCardForm) => {
+    // Security: the acting user's id MUST accompany the payload for the
+    // audit trail. Refuse to build a job card without it.
+    if (!user?.id) {
+      createMutation.reset();
+      window.alert(
+        "Your session is missing a verified user. Please sign in again before creating a job card.",
+      );
+      return;
+    }
+
+    const payload: CreateJobCardInput = {
+      customer_id: values.customer_id,
+      vehicle_id: values.vehicle_id,
+      assigned_technician_id: values.assigned_technician_id,
+      status: "In Progress",
+      service_item_ids: values.services.map((s) => s.service_id),
+      subtotal: totals.subtotal,
+      total_tax: totals.tax,
+      total_amount: grandTotal,
+      warranty_end_date: values.warranty_end_date || null,
+      warranty_notes: values.warranty_notes || null,
+      created_by: user.id,
+    };
+
+    createMutation.mutate(payload, {
+      onSuccess: () => router.push("/jobs"),
+    });
   };
 
   return (
@@ -109,226 +251,232 @@ export default function CreateJobPage() {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">
             Create New Job Card
           </h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Log customer details and assign services to technicians.
+          <p className="mt-1 text-sm text-gray-500">
+            Select a customer and vehicle, then assign services to a
+            technician.
           </p>
         </div>
-        <button
-          type="button"
-          className="hidden rounded-md border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-        >
-          Save Draft
-        </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Left column */}
-        <div className="space-y-6">
-          {/* Customer Information */}
-          <section className="rounded-md border border-gray-200 bg-white">
-            <div className="flex items-center gap-2 border-b border-gray-200 px-5 py-4">
-              <User className="h-4 w-4 text-theme-accent" />
-              <h2 className="text-base font-semibold text-gray-900">
-                Customer Information
-              </h2>
-            </div>
-            <div className="space-y-4 p-5">
-              <Field label="Customer Name" error={errors.customerName?.message}>
-                <input
-                  {...register("customerName")}
-                  placeholder="e.g. John Doe"
-                  className={inputClass(!!errors.customerName)}
+      {/* Forced light-grey container card — stays light even in dark mode. */}
+      <div
+        style={{ backgroundColor: "#eceef1", colorScheme: "light" }}
+        className="rounded-2xl border border-gray-200/70 p-5 shadow-sm sm:p-6"
+      >
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {/* Left column */}
+          <div className="space-y-5">
+            {/* Customer */}
+            <Section icon={<UserIcon className="h-4 w-4" />} title="Customer">
+              <Field label="Customer" error={errors.customer_id?.message}>
+                <Controller
+                  control={control}
+                  name="customer_id"
+                  render={({ field }) => (
+                    <Combobox
+                      options={customerOptions}
+                      value={field.value}
+                      onChange={handleCustomerChange}
+                      placeholder={
+                        customersQuery.isLoading
+                          ? "Loading customers..."
+                          : "Search customer..."
+                      }
+                      disabled={customersQuery.isLoading}
+                      className={inputClass(!!errors.customer_id)}
+                      emptyMessage="No customers found"
+                    />
+                  )}
+                />
+              </Field>
+            </Section>
+
+            {/* Vehicle */}
+            <Section
+              icon={<CarFront className="h-4 w-4" />}
+              title="Vehicle Details"
+            >
+              <Field label="Vehicle" error={errors.vehicle_id?.message}>
+                <Controller
+                  control={control}
+                  name="vehicle_id"
+                  render={({ field }) => (
+                    <Combobox
+                      options={vehicleOptions}
+                      value={field.value}
+                      onChange={handleVehicleChange}
+                      placeholder={
+                        !customerId
+                          ? "Select a customer first"
+                          : vehiclesQuery.isLoading
+                            ? "Loading vehicles..."
+                            : "Search vehicle..."
+                      }
+                      disabled={!customerId || vehiclesQuery.isLoading}
+                      className={inputClass(!!errors.vehicle_id)}
+                      emptyMessage="No vehicles for this customer"
+                    />
+                  )}
                 />
               </Field>
 
-              <Field label="Mobile Number" error={errors.mobile?.message}>
-                <input
-                  {...register("mobile")}
-                  placeholder="10-digit number"
-                  className={inputClass(!!errors.mobile)}
-                />
-              </Field>
-
-            </div>
-          </section>
-
-          {/* Vehicle Information */}
-          <section className="rounded-md border border-gray-200 bg-white">
-            <div className="flex items-center gap-2 border-b border-gray-200 px-5 py-4">
-              <CarFront className="h-4 w-4 text-theme-accent" />
-              <h2 className="text-base font-semibold text-gray-900">
-                Vehicle Details
-              </h2>
-            </div>
-            <div className="space-y-4 p-5">
               <Field label="Vehicle Type" error={errors.vehicleType?.message}>
-                <div className="flex gap-4">
-                  {["Car", "Bike", "Others"].map((type) => (
-                    <label key={type} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        value={type}
-                        {...register("vehicleType")}
-                        className="h-4 w-4 text-theme-accent focus:ring-theme-accent border-gray-300"
-                        onChange={(e) => {
-                          register("vehicleType").onChange(e);
-                          setValue("manufacturer", "");
-                          setValue("model", "");
-                        }}
-                      />
-                      <span className="text-sm font-medium text-gray-900">{type}</span>
-                    </label>
-                  ))}
+                <div className="flex gap-2">
+                  {VEHICLE_TYPES.map((type) => {
+                    const active = vehicleType === type;
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => handleVehicleTypeChange(type)}
+                        className={cn(
+                          "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                          active
+                            ? "border-theme-accent bg-theme-accent text-white"
+                            : "border-gray-200 bg-white text-gray-600 hover:border-gray-300",
+                        )}
+                      >
+                        {type}
+                      </button>
+                    );
+                  })}
                 </div>
               </Field>
 
               <Field
-                label="Vehicle Manufacturer"
+                label="Manufacturer"
                 error={errors.manufacturer?.message}
               >
                 <Controller
                   control={control}
                   name="manufacturer"
-                  render={({ field }) => {
-                    const type = useWatch({ control, name: "vehicleType" }) || "Car";
-                    const options = manufacturers.data?.[type] || [];
-                    return (
-                      <Combobox
-                        options={options}
-                        value={field.value}
-                        onChange={field.onChange}
-                        placeholder={manufacturers.isLoading ? "Loading manufacturers..." : "Select Manufacturer..."}
-                        disabled={manufacturers.isLoading}
-                        className={inputClass(!!errors.manufacturer)}
-                      />
-                    );
-                  }}
+                  render={({ field }) => (
+                    <Combobox
+                      options={manufacturerOptions}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder={
+                        !vehicleType
+                          ? "Select a vehicle type first"
+                          : "Select manufacturer..."
+                      }
+                      disabled={!vehicleType || manufacturers.isLoading}
+                      className={inputClass(!!errors.manufacturer)}
+                      emptyMessage="No manufacturers"
+                    />
+                  )}
                 />
               </Field>
 
-              <Field label="Vehicle Model" error={errors.model?.message}>
+              <Field label="Model" error={errors.model?.message}>
                 <input
                   {...register("model")}
-                  placeholder="e.g. Corolla, Civic, Actros"
+                  placeholder="e.g. Innova Crysta"
                   className={inputClass(!!errors.model)}
                 />
               </Field>
 
               <Field
-                label="Vehicle License ID"
-                error={errors.vehicleNumber?.message}
+                label="Registration Number"
+                error={errors.registration_number?.message}
               >
                 <input
-                  {...register("vehicleNumber", {
+                  {...register("registration_number", {
                     onChange: (e) => {
                       e.target.value = e.target.value.toUpperCase();
                     },
                   })}
-                  placeholder="E.G. LHR-1234"
-                  className={cn(inputClass(!!errors.vehicleNumber), "uppercase")}
+                  placeholder="E.G. KL-07-AB-1234"
+                  className={cn(
+                    inputClass(!!errors.registration_number),
+                    "uppercase",
+                  )}
                 />
               </Field>
+            </Section>
 
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Wheel Type" error={errors.wheelType?.message}>
-                  <div className="flex gap-4">
-                    {["Alloy", "Steel"].map((type) => (
-                      <label key={type} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          value={type}
-                          {...register("wheelType")}
-                          className="h-4 w-4 text-theme-accent focus:ring-theme-accent border-gray-300"
-                        />
-                        <span className="text-sm font-medium text-gray-900">{type}</span>
-                      </label>
-                    ))}
-                  </div>
-                </Field>
-                <Field label="Tyre Type" error={errors.tyreType?.message}>
-                  <div className="flex gap-4">
-                    {["TL", "TT"].map((type) => (
-                      <label key={type} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          value={type}
-                          {...register("tyreType")}
-                          className="h-4 w-4 text-theme-accent focus:ring-theme-accent border-gray-300"
-                        />
-                        <span className="text-sm font-medium text-gray-900">{type}</span>
-                      </label>
-                    ))}
-                  </div>
-                </Field>
-              </div>
-            </div>
-          </section>
-
-          {/* Assignment */}
-          <section className="rounded-md border border-gray-200 bg-white">
-            <div className="flex items-center gap-2 border-b border-gray-200 px-5 py-4">
-              <ClipboardCheck className="h-4 w-4 text-theme-accent" />
-              <h2 className="text-base font-semibold text-gray-900">
-                Assignment
-              </h2>
-            </div>
-            <div className="p-5">
+            {/* Assignment */}
+            <Section
+              icon={<ClipboardCheck className="h-4 w-4" />}
+              title="Assignment"
+            >
               <Field
                 label="Lead Technician"
-                error={errors.technician?.message}
+                error={errors.assigned_technician_id?.message}
               >
-                <div className="relative">
-                  <select
-                    {...register("technician")}
-                    defaultValue=""
-                    disabled={technicians.isLoading}
-                    className={cn(inputClass(!!errors.technician), "appearance-none pr-9")}
-                  >
-                    <option value="" disabled>
-                      {technicians.isLoading
-                        ? "Loading technicians..."
-                        : "Select Technician..."}
-                    </option>
-                    {(technicians.data ?? []).map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                </div>
+                <Controller
+                  control={control}
+                  name="assigned_technician_id"
+                  render={({ field }) => (
+                    <Combobox
+                      options={technicianOptions}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder={
+                        techniciansQuery.isLoading
+                          ? "Loading technicians..."
+                          : "Select technician..."
+                      }
+                      disabled={techniciansQuery.isLoading}
+                      className={inputClass(!!errors.assigned_technician_id)}
+                      emptyMessage="No technicians"
+                    />
+                  )}
+                />
               </Field>
-            </div>
-          </section>
-        </div>
+            </Section>
 
-        {/* Right column - Service Items */}
-        <div className="space-y-6">
-          <section className="rounded-md border border-gray-200 bg-white">
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-              <div className="flex items-center gap-2">
-                <Wrench className="h-4 w-4 text-theme-accent" />
-                <h2 className="text-base font-semibold text-gray-900">
-                  Service Items
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => append({ name: "", qty: 1, rate: 0, isTaxable: true })}
-                className="inline-flex items-center gap-1 text-sm font-semibold text-theme-accent transition-colors hover:text-theme-accent-dark"
-              >
-                <Plus className="h-4 w-4" /> Add Item
-              </button>
-            </div>
+            {/* Warranty */}
+            <Section
+              icon={<ShieldCheck className="h-4 w-4" />}
+              title="Warranty (optional)"
+            >
+              <Field label="Warranty End Date">
+                <input
+                  type="date"
+                  {...register("warranty_end_date")}
+                  className={inputClass(false)}
+                />
+              </Field>
+              <Field label="Warranty Notes">
+                <textarea
+                  {...register("warranty_notes")}
+                  rows={2}
+                  placeholder="e.g. 6 months on wheel alignment"
+                  className={cn(inputClass(false), "resize-none")}
+                />
+              </Field>
+            </Section>
+          </div>
 
-            <div className="p-5">
+          {/* Right column - Service Items */}
+          <div className="space-y-5">
+            <Section
+              icon={<Wrench className="h-4 w-4" />}
+              title="Service Items"
+              action={
+                <button
+                  type="button"
+                  onClick={() =>
+                    append({
+                      service_id: "",
+                      name: "",
+                      qty: 1,
+                      rate: 0,
+                      gst_rate: 18,
+                    })
+                  }
+                  className="inline-flex items-center gap-1 text-sm font-semibold text-theme-accent transition-colors hover:text-theme-accent-dark"
+                >
+                  <Plus className="h-4 w-4" /> Add Item
+                </button>
+              }
+            >
               <div className="w-full">
-                {/* Column headers */}
-                <div className="hidden md:grid md:grid-cols-[1fr_64px_96px_40px_104px_32px] items-center gap-2 border-b border-gray-200 pb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                <div className="hidden md:grid md:grid-cols-[1fr_64px_96px_104px_32px] items-center gap-2 border-b border-gray-200 pb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                   <span>Service / Part</span>
                   <span className="text-center">Qty</span>
-                  <span className="text-center">Rate (INR)</span>
-                  <span className="text-center">Tax</span>
+                  <span className="text-center">Rate</span>
                   <span className="text-right">Amount</span>
                   <span />
                 </div>
@@ -342,31 +490,38 @@ export default function CreateJobPage() {
                     return (
                       <div
                         key={field.id}
-                        className="flex flex-col gap-4 py-4 md:grid md:grid-cols-[1fr_64px_96px_40px_104px_32px] md:items-center md:gap-2 md:py-3"
+                        className="flex flex-col gap-4 py-4 md:grid md:grid-cols-[1fr_64px_96px_104px_32px] md:items-center md:gap-2 md:py-3"
                       >
                         <div className="w-full">
-                          <span className="mb-1.5 block text-[10px] font-semibold uppercase text-gray-500 md:hidden">
+                          <span className="mb-1.5 block text-[10px] font-semibold uppercase text-gray-400 md:hidden">
                             Service / Part
                           </span>
                           <Controller
                             control={control}
-                            name={`services.${index}.name` as const}
-                            render={({ field: nameField }) => (
+                            name={`services.${index}.service_id` as const}
+                            render={({ field: serviceField }) => (
                               <Combobox
-                                options={services.data ?? []}
-                                value={nameField.value}
-                                onChange={nameField.onChange}
-                                placeholder={services.isLoading ? "Loading..." : "Select service / part..."}
-                                disabled={services.isLoading}
-                                className={inputClass(!!rowError?.name)}
+                                options={serviceOptions}
+                                value={serviceField.value}
+                                onChange={(val) =>
+                                  handleServiceChange(index, val)
+                                }
+                                placeholder={
+                                  servicesQuery.isLoading
+                                    ? "Loading..."
+                                    : "Select service..."
+                                }
+                                disabled={servicesQuery.isLoading}
+                                className={inputClass(!!rowError?.service_id)}
+                                emptyMessage="No services"
                               />
                             )}
                           />
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3 md:contents">
+                        <div className="grid grid-cols-2 gap-3 md:contents">
                           <div>
-                            <span className="mb-1.5 block text-[10px] font-semibold uppercase text-gray-500 md:hidden">
+                            <span className="mb-1.5 block text-[10px] font-semibold uppercase text-gray-400 md:hidden">
                               Qty
                             </span>
                             <input
@@ -375,11 +530,14 @@ export default function CreateJobPage() {
                               {...register(`services.${index}.qty` as const, {
                                 valueAsNumber: true,
                               })}
-                              className={cn(inputClass(!!rowError?.qty), "text-center")}
+                              className={cn(
+                                inputClass(!!rowError?.qty),
+                                "text-center",
+                              )}
                             />
                           </div>
                           <div>
-                            <span className="mb-1.5 block text-[10px] font-semibold uppercase text-gray-500 md:hidden">
+                            <span className="mb-1.5 block text-[10px] font-semibold uppercase text-gray-400 md:hidden">
                               Rate
                             </span>
                             <input
@@ -390,26 +548,17 @@ export default function CreateJobPage() {
                                 valueAsNumber: true,
                               })}
                               onFocus={(e) => e.target.select()}
-                              className={cn(inputClass(!!rowError?.rate), "text-center")}
+                              className={cn(
+                                inputClass(!!rowError?.rate),
+                                "text-center",
+                              )}
                             />
-                          </div>
-                          <div className="flex flex-col items-center">
-                            <span className="mb-1.5 block text-[10px] font-semibold uppercase text-gray-500 md:hidden">
-                              Tax
-                            </span>
-                            <div className="flex h-9 items-center justify-center md:h-auto">
-                              <input
-                                type="checkbox"
-                                {...register(`services.${index}.isTaxable` as const)}
-                                className="h-4 w-4 rounded border-gray-300 text-theme-accent focus:ring-theme-accent cursor-pointer"
-                              />
-                            </div>
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between border-t border-gray-100 pt-3 md:contents md:border-0 md:pt-0">
                           <div className="flex items-center gap-2 md:contents">
-                            <span className="text-[10px] font-semibold uppercase text-gray-500 md:hidden">
+                            <span className="text-[10px] font-semibold uppercase text-gray-400 md:hidden">
                               Amount:
                             </span>
                             <span className="text-sm font-semibold text-gray-900 tabular-nums md:text-right md:font-medium">
@@ -437,21 +586,18 @@ export default function CreateJobPage() {
                 </p>
               )}
 
-              {/* Totals */}
               <div className="mt-4 space-y-2 border-t border-gray-200 pt-4 text-sm">
-                <div className="flex items-center justify-between text-gray-600">
+                <div className="flex items-center justify-between text-gray-500">
                   <span>Subtotal</span>
-                  <span className="tabular-nums">{formatCurrency(subtotal)}</span>
+                  <span className="tabular-nums">
+                    {formatCurrency(totals.subtotal)}
+                  </span>
                 </div>
-                {subtotalData.nonTaxable > 0 && (
-                  <div className="flex items-center justify-between text-gray-500 text-xs">
-                    <span>Includes Non-Taxable</span>
-                    <span className="tabular-nums">{formatCurrency(subtotalData.nonTaxable)}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between text-gray-600">
-                  <span>GST (18% on {formatCurrency(subtotalData.taxable)})</span>
-                  <span className="tabular-nums">{formatCurrency(gst)}</span>
+                <div className="flex items-center justify-between text-gray-500">
+                  <span>GST</span>
+                  <span className="tabular-nums">
+                    {formatCurrency(totals.tax)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between border-t border-gray-200 pt-2 text-base font-bold text-gray-900">
                   <span>Total INR</span>
@@ -460,29 +606,54 @@ export default function CreateJobPage() {
                   </span>
                 </div>
               </div>
-            </div>
-          </section>
+            </Section>
 
-          {/* Submit */}
-          <div className="flex flex-col items-end gap-2">
-            {createJob.isError && (
-              <p className="text-sm font-medium text-theme-accent">
-                {(createJob.error as Error)?.message ??
-                  "Failed to create job card."}
-              </p>
-            )}
-            <button
-              type="submit"
-              disabled={createJob.isPending}
-              className="inline-flex items-center gap-2 rounded-md bg-theme-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-theme-accent-dark disabled:opacity-60"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              {createJob.isPending ? "Finalizing..." : "Finalize Job Card"}
-            </button>
+            {/* Submit */}
+            <div className="flex flex-col items-end gap-2">
+              {createMutation.isError && (
+                <p className="text-sm font-medium text-theme-accent">
+                  {(createMutation.error as Error)?.message ??
+                    "Failed to create job card."}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={createMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-lg bg-theme-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-theme-accent-dark disabled:opacity-60"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {createMutation.isPending ? "Finalizing..." : "Finalize Job Card"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </form>
+  );
+}
+
+function Section({
+  icon,
+  title,
+  action,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white">
+      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
+        <div className="flex items-center gap-2 text-gray-900">
+          <span className="text-gray-500">{icon}</span>
+          <h2 className="text-sm font-semibold">{title}</h2>
+        </div>
+        {action}
+      </div>
+      <div className="space-y-4 p-5">{children}</div>
+    </section>
   );
 }
 
@@ -497,20 +668,18 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
         {label}
       </label>
       {children}
-      {error && (
-        <p className="mt-1 text-xs font-medium text-theme-accent">{error}</p>
-      )}
+      {error && <p className="mt-1 text-xs font-medium text-theme-accent">{error}</p>}
     </div>
   );
 }
 
 function inputClass(hasError: boolean): string {
   return cn(
-    "w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1",
+    "w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1",
     hasError
       ? "border-theme-accent focus:border-theme-accent focus:ring-theme-accent"
       : "border-gray-200 focus:border-theme-accent focus:ring-theme-accent",
