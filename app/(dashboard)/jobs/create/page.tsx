@@ -712,6 +712,7 @@ function CreateJobForm() {
                             <input
                               type="number"
                               min={1}
+                              onWheel={(e) => (e.target as HTMLInputElement).blur()}
                               {...register(`services.${index}.qty` as const, {
                                 valueAsNumber: true,
                               })}
@@ -729,6 +730,7 @@ function CreateJobForm() {
                               type="number"
                               min={0}
                               step="0.01"
+                              onWheel={(e) => (e.target as HTMLInputElement).blur()}
                               {...register(`services.${index}.rate` as const, {
                                 valueAsNumber: true,
                               })}

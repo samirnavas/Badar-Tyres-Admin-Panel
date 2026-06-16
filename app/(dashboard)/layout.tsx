@@ -1,14 +1,19 @@
 import { DashboardShell } from "@/components/DashboardShell";
 import { AuthGuard } from "@/components/AuthGuard";
+import { getExpiringNotifications } from "@/lib/repositories/vehicle_repository";
 
-export default function DashboardLayout({
+export const dynamic = 'force-dynamic';
+
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const notifications = await getExpiringNotifications();
+
   return (
     <AuthGuard>
-      <DashboardShell>{children}</DashboardShell>
+      <DashboardShell notifications={notifications}>{children}</DashboardShell>
     </AuthGuard>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";
-import { Search, RefreshCw, Bell, Menu, LogOut, ChevronDown } from "lucide-react";
+import { Search, RefreshCw, Menu, LogOut, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -62,11 +62,6 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
         >
           <RefreshCw className="h-4 w-4" />
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        </button>
-
-        <button className="relative rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900">
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-theme-accent" />
         </button>
 
         <div className="mx-1 h-8 w-px bg-gray-200" />

@@ -99,3 +99,68 @@ export async function getVehicle360(vehicleId: string): Promise<Vehicle360 | nul
 
   return { vehicle, customer, jobs };
 }
+
+export interface NotificationItem {
+  id: string;
+  vehicleId: string;
+  regNo: string;
+  customerName: string;
+  customerPhone: string;
+  type: "Insurance" | "Pollution" | "Service";
+  dueDate: string;
+  isExpired: boolean;
+  daysRemaining: number;
+}
+
+export async function getExpiringNotifications(daysThreshold = 30): Promise<NotificationItem[]> {
+  await simulateLatency();
+  const vehicles = await readData<Vehicle[]>(FILE_NAME);
+  const customers = await readData<Customer[]>("customers.json");
+
+  const notifications: NotificationItem[] = [];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  vehicles.forEach((vehicle) => {
+    const customer = customers.find((c) => c.id === vehicle.customer_id);
+    const customerName = customer?.name || "Unknown";
+    const customerPhone = customer?.phone || "N/A";
+
+    const checkExpiry = (dateString: string | null | undefined, type: "Insurance" | "Pollution" | "Service") => {
+      if (!dateString) return;
+
+      const dueDate = new Date(dateString);
+      dueDate.setHours(0, 0, 0, 0);
+
+      const diffTime = dueDate.getTime() - today.getTime();
+      const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (daysRemaining <= daysThreshold) {
+        notifications.push({
+          id: `${vehicle.id}-${type}`,
+          vehicleId: vehicle.id,
+          regNo: vehicle.registration_number,
+          customerName,
+          customerPhone,
+          type,
+          dueDate: dateString,
+          isExpired: daysRemaining < 0,
+          daysRemaining,
+        });
+      }
+    };
+
+    checkExpiry(vehicle.insurance_expiry, "Insurance");
+    checkExpiry(vehicle.pollution_expiry, "Pollution");
+    checkExpiry(vehicle.next_service_date, "Service");
+  });
+
+  notifications.sort((a, b) => {
+    if (a.isExpired && !b.isExpired) return -1;
+    if (!a.isExpired && b.isExpired) return 1;
+    return a.daysRemaining - b.daysRemaining;
+  });
+
+  return notifications;
+}

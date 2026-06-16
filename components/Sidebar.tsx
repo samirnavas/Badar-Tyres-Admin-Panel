@@ -11,6 +11,7 @@ import {
   X,
   Wrench,
   Receipt,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/format";
 
@@ -21,15 +22,18 @@ const navItems = [
   { label: "Billing", href: "/billing", icon: Receipt },
   { label: "CRM", href: "/users", icon: Users },
   { label: "Vehicle Fleet Logs", href: "/vehicles", icon: Truck },
+  { label: "Notifications", href: "/notifications", icon: Bell },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar({
   open = false,
   onClose,
+  unreadNotificationsCount = 0,
 }: {
   open?: boolean;
   onClose?: () => void;
+  unreadNotificationsCount?: number;
 }) {
   const pathname = usePathname();
 
@@ -88,6 +92,11 @@ export function Sidebar({
                   strokeWidth={isActive ? 2.2 : 1.9}
                 />
                 <span>{label}</span>
+                {label === "Notifications" && unreadNotificationsCount > 0 && (
+                  <span className="ml-auto inline-flex items-center justify-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                    {unreadNotificationsCount > 9 ? "9+" : unreadNotificationsCount}
+                  </span>
+                )}
               </Link>
             );
           })}

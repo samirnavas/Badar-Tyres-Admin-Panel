@@ -246,6 +246,7 @@ export default function SettingsClient({
                 <div className="relative w-40">
                   <input
                     type="number"
+                    onWheel={(e) => (e.target as HTMLInputElement).blur()}
                     step="0.01"
                     min={0}
                     max={100}
