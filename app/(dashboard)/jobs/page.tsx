@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, ShieldCheck } from "lucide-react";
-import { getJobCards, getCustomers, getVehicles } from "@/lib/repositories";
+import { getJobCards, getCustomers, getVehicles, getTechnicians } from "@/lib/repositories";
 import type { JobCard, JobCardStatus } from "@/lib/models/JobCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Combobox, type ComboboxOption } from "@/components/ui/Combobox";
 import { cn, formatCurrency, formatDate, isWarrantyActive } from "@/lib/format";
 
 type TabValue = JobCardStatus | "all";
@@ -24,12 +25,15 @@ const tabs: { value: TabValue; label: string }[] = [
 interface JobRow extends JobCard {
   customerName: string;
   vehicleModel: string;
+  vehicleRegistration: string;
+  technicianName: string;
   warrantyActive: boolean;
 }
 
 export default function JobsPage() {
   const router = useRouter();
   const [tab, setTab] = useState<TabValue>("all");
+  const [selectedTechnician, setSelectedTechnician] = useState<string>("all");
 
   const jobsQuery = useQuery({ queryKey: ["job-cards"], queryFn: getJobCards });
   const customersQuery = useQuery({
@@ -40,20 +44,44 @@ export default function JobsPage() {
     queryKey: ["vehicles"],
     queryFn: getVehicles,
   });
+  const techniciansQuery = useQuery({
+    queryKey: ["technicians"],
+    queryFn: getTechnicians,
+  });
+
+  const technicianOptions: ComboboxOption[] = useMemo(() => {
+    const defaultOption = { value: "all", label: "All Technicians" };
+    if (!techniciansQuery.data) return [defaultOption];
+    return [
+      defaultOption,
+      ...techniciansQuery.data.map((t) => ({
+        value: t.id,
+        label: t.name,
+      })),
+    ];
+  }, [techniciansQuery.data]);
 
   const isLoading =
-    jobsQuery.isLoading || customersQuery.isLoading || vehiclesQuery.isLoading;
+    jobsQuery.isLoading || customersQuery.isLoading || vehiclesQuery.isLoading || techniciansQuery.isLoading;
   const isError =
-    jobsQuery.isError || customersQuery.isError || vehiclesQuery.isError;
+    jobsQuery.isError || customersQuery.isError || vehiclesQuery.isError || techniciansQuery.isError;
 
   const rows: JobRow[] = useMemo(() => {
     const customerMap = new Map(
       (customersQuery.data ?? []).map((c) => [c.id, c]),
     );
     const vehicleMap = new Map((vehiclesQuery.data ?? []).map((v) => [v.id, v]));
+    const technicianMap = new Map(
+      (techniciansQuery.data ?? []).map((t) => [t.id, t]),
+    );
 
     return (jobsQuery.data ?? [])
       .filter((job) => tab === "all" || job.status === tab)
+      .filter(
+        (job) =>
+          selectedTechnician === "all" ||
+          job.assigned_technician_id === selectedTechnician,
+      )
       .map((job) => {
         const vehicle = vehicleMap.get(job.vehicle_id);
         return {
@@ -62,10 +90,20 @@ export default function JobsPage() {
           vehicleModel: vehicle
             ? `${vehicle.manufacturer} ${vehicle.model}`
             : "—",
+          vehicleRegistration: vehicle ? vehicle.registration_number : "—",
+          technicianName:
+            technicianMap.get(job.assigned_technician_id)?.name ?? "Unassigned",
           warrantyActive: isWarrantyActive(job.warranty_end_date),
         };
       });
-  }, [jobsQuery.data, customersQuery.data, vehiclesQuery.data, tab]);
+  }, [
+    jobsQuery.data,
+    customersQuery.data,
+    vehiclesQuery.data,
+    techniciansQuery.data,
+    tab,
+    selectedTechnician,
+  ]);
 
   const goToJob = (id: string) => router.push(`/jobs/${id}`);
 
@@ -88,22 +126,39 @@ export default function JobsPage() {
         </Link>
       </div>
 
-      {/* Status filter tabs */}
-      <div className="flex flex-wrap items-center gap-2">
-        {tabs.map((t) => (
-          <button
-            key={t.value}
-            onClick={() => setTab(t.value)}
-            className={cn(
-              "rounded-lg border px-3.5 py-1.5 text-sm font-medium transition-colors",
-              tab === t.value
-                ? "border-theme-accent bg-theme-accent text-white"
-                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Filters */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {tabs.map((t) => (
+            <button
+              key={t.value}
+              onClick={() => setTab(t.value)}
+              className={cn(
+                "rounded-lg border px-3.5 py-1.5 text-sm font-medium transition-colors",
+                tab === t.value
+                  ? "border-theme-accent bg-theme-accent text-white"
+                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+            Technician:
+          </label>
+          <div className="w-48">
+            <Combobox
+              options={technicianOptions}
+              value={selectedTechnician}
+              onChange={(value) => setSelectedTechnician(value || "all")}
+              placeholder={techniciansQuery.isLoading ? "Loading..." : "Select technician..."}
+              disabled={techniciansQuery.isLoading}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
@@ -114,6 +169,8 @@ export default function JobsPage() {
               <tr className="border-b border-gray-200 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                 <th className="px-6 py-3.5">Customer</th>
                 <th className="px-6 py-3.5">Vehicle</th>
+                <th className="px-6 py-3.5">Reg. No</th>
+                <th className="px-6 py-3.5">Technician</th>
                 <th className="px-6 py-3.5">Status</th>
                 <th className="px-6 py-3.5">Created</th>
                 <th className="px-6 py-3.5 text-right">Total</th>
@@ -123,7 +180,7 @@ export default function JobsPage() {
               {isLoading &&
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 5 }).map((__, j) => (
+                    {Array.from({ length: 7 }).map((__, j) => (
                       <td key={j} className="px-6 py-4">
                         <Skeleton className="h-4 w-full" />
                       </td>
@@ -153,6 +210,12 @@ export default function JobsPage() {
                     <td className="px-6 py-4 text-gray-600">
                       {job.vehicleModel}
                     </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {job.vehicleRegistration}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {job.technicianName}
+                    </td>
                     <td className="px-6 py-4">
                       <StatusBadge status={job.status} />
                     </td>
@@ -168,7 +231,7 @@ export default function JobsPage() {
               {!isLoading && isError && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={7}
                     className="px-6 py-12 text-center text-sm text-theme-accent"
                   >
                     Failed to load job cards.
@@ -179,7 +242,7 @@ export default function JobsPage() {
               {!isLoading && !isError && rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={7}
                     className="px-6 py-12 text-center text-sm text-gray-500"
                   >
                     No job cards match this filter.
@@ -226,6 +289,14 @@ export default function JobsPage() {
                   <div>
                     <div className="text-xs text-gray-400">Vehicle</div>
                     <div className="text-gray-900">{job.vehicleModel}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Reg. No</div>
+                    <div className="text-gray-900">{job.vehicleRegistration}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Technician</div>
+                    <div className="text-gray-900">{job.technicianName}</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-400">Created</div>

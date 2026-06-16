@@ -1,5 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+
 import {
   LayoutGrid,
   RefreshCw,
@@ -13,20 +16,39 @@ import {
 import Link from "next/link";
 import { useJobs } from "@/lib/hooks";
 import { useQuery } from "@tanstack/react-query";
-import { getDashboardMetrics } from "@/lib/repositories";
+import { getDashboardMetrics, getServiceAnalytics } from "@/lib/repositories";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { ServiceAnalyticsWidget } from "@/components/dashboard/ServiceAnalyticsWidget";
+import { RevenueChartWidget } from "@/components/dashboard/RevenueChartWidget";
 import { UpcomingServicesWidget } from "@/components/dashboard/UpcomingServicesWidget";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatCurrency, cn } from "@/lib/format";
 import type { Job } from "@/lib/types";
+import type { Timeframe } from "@/lib/repositories/job_repository";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const timeframe = (searchParams.get("timeframe") as Timeframe) || "today";
+
+  const handleTimeframeChange = (newTimeframe: Timeframe) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("timeframe", newTimeframe);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+
   const jobs = useJobs();
   
   const dashboardMetricsQuery = useQuery({
-    queryKey: ["dashboardMetrics"],
-    queryFn: getDashboardMetrics,
+    queryKey: ["dashboardMetrics", timeframe],
+    queryFn: () => getDashboardMetrics(timeframe),
+  });
+
+  const serviceAnalyticsQuery = useQuery({
+    queryKey: ["serviceAnalytics", timeframe],
+    queryFn: () => getServiceAnalytics(timeframe),
   });
 
   const recent = (jobs.data ?? []).slice(0, 5);
@@ -47,9 +69,23 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
-            <Calendar className="h-4 w-4" /> Today
-          </button>
+          {/* Timeframe Selector */}
+          <div className="flex rounded-md border border-gray-200 bg-white p-1">
+            {(["today", "week", "month", "all"] as Timeframe[]).map((tf) => (
+              <button
+                key={tf}
+                onClick={() => handleTimeframeChange(tf)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-semibold capitalize transition-colors rounded-sm",
+                  timeframe === tf
+                    ? "bg-theme-accent text-white"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                )}
+              >
+                {tf === "all" ? "All Time" : tf === "today" ? "Today" : `This ${tf}`}
+              </button>
+            ))}
+          </div>
           <Link
             href="/jobs/create"
             className="inline-flex items-center gap-2 rounded-md bg-theme-accent px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-theme-accent-dark"
@@ -60,12 +96,18 @@ export default function DashboardPage() {
       </div>
 
       {/* Metric cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          label="Today's Revenue"
-          value={`₹${formatCurrency(dashboardMetricsQuery.data?.todaysRevenue ?? 0)}`}
+          label="Revenue"
+          value={`₹${formatCurrency(dashboardMetricsQuery.data?.revenue ?? 0)}`}
           icon={TrendingUp}
           loading={dashboardMetricsQuery.isLoading}
+        />
+        <MetricCard
+          label="Avg Ticket Size"
+          value={`₹${formatCurrency(serviceAnalyticsQuery.data?.averageTicketSize ?? 0)}`}
+          icon={TrendingUp}
+          loading={serviceAnalyticsQuery.isLoading}
         />
         <MetricCard
           label="Pending Jobs"
@@ -83,8 +125,16 @@ export default function DashboardPage() {
 
       {/* Grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Recent Customer Activities */}
-        <section className="rounded-md border border-gray-200 bg-white lg:col-span-2">
+        {/* Main Column */}
+        <div className="space-y-6 lg:col-span-2">
+          {/* Revenue Trend */}
+          <RevenueChartWidget timeframe={timeframe} />
+
+          {/* Service Analytics */}
+          <ServiceAnalyticsWidget timeframe={timeframe} />
+
+          {/* Recent Customer Activities */}
+          <section className="rounded-md border border-gray-200 bg-white">
           <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
             <h2 className="text-base font-semibold text-gray-900">
               Recent Customer Activities
@@ -179,6 +229,7 @@ export default function DashboardPage() {
             )}
           </div>
         </section>
+        </div>
 
         {/* Side column */}
         <div className="space-y-6">

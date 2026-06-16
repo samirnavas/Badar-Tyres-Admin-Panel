@@ -21,6 +21,10 @@ const customerSchema = z.object({
     .union([z.string().email("Enter a valid email"), z.literal("")])
     .optional(),
   address: z.string().optional(),
+  gst_number: z.string().optional(),
+  customer_type: z.enum(["Retail", "Corporate", "Fleet"]).optional(),
+  tags: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
@@ -47,13 +51,32 @@ export function CustomerFormModal({
     formState: { errors },
   } = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
-    defaultValues: { name: initialName, phone: "", email: "", address: "" },
+    defaultValues: {
+      name: initialName,
+      phone: "",
+      email: "",
+      address: "",
+      gst_number: "",
+      customer_type: "Retail",
+      tags: "",
+      notes: "",
+    },
   });
 
   // Re-seed the form each time the modal opens (e.g. with the search term
   // pre-filled when launched from the job-card combobox).
   useEffect(() => {
-    if (open) reset({ name: initialName, phone: "", email: "", address: "" });
+    if (open)
+      reset({
+        name: initialName,
+        phone: "",
+        email: "",
+        address: "",
+        gst_number: "",
+        customer_type: "Retail",
+        tags: "",
+        notes: "",
+      });
   }, [open, initialName, reset]);
 
   const mutation = useMutation({
@@ -63,6 +86,12 @@ export function CustomerFormModal({
         phone: values.phone.trim(),
         email: values.email?.trim() ?? "",
         address: values.address?.trim() ?? "",
+        gst_number: values.gst_number?.trim() ?? "",
+        customer_type: values.customer_type ?? "Retail",
+        tags: values.tags
+          ? values.tags.split(",").map((t) => t.trim()).filter(Boolean)
+          : [],
+        notes: values.notes?.trim() ?? "",
       }),
     onSuccess: (customer) => {
       queryClient.setQueryData<Customer[]>(["customers"], (old) =>
@@ -160,6 +189,42 @@ export function CustomerFormModal({
               rows={2}
               placeholder="Street, city, state, PIN"
               className={cn(inputClass(!!errors.address), "resize-none")}
+            />
+          </Field>
+
+          <Field label="GST Number (optional)" error={errors.gst_number?.message}>
+            <input
+              {...register("gst_number")}
+              placeholder="e.g. 27AADCB2230M1Z2"
+              className={inputClass(!!errors.gst_number)}
+            />
+          </Field>
+
+          <Field label="Customer Type" error={errors.customer_type?.message}>
+            <select
+              {...register("customer_type")}
+              className={inputClass(!!errors.customer_type)}
+            >
+              <option value="Retail">Retail</option>
+              <option value="Corporate">Corporate</option>
+              <option value="Fleet">Fleet</option>
+            </select>
+          </Field>
+
+          <Field label="Tags (Comma separated)" error={errors.tags?.message}>
+            <input
+              {...register("tags")}
+              placeholder="e.g. VIP, Late Payer"
+              className={inputClass(!!errors.tags)}
+            />
+          </Field>
+
+          <Field label="Notes" error={errors.notes?.message}>
+            <textarea
+              {...register("notes")}
+              rows={2}
+              placeholder="Manager notes..."
+              className={cn(inputClass(!!errors.notes), "resize-none")}
             />
           </Field>
 

@@ -51,3 +51,51 @@ export async function createVehicle(
 
   return vehicle;
 }
+
+/**
+ * Updates an existing vehicle.
+ */
+export async function updateVehicle(
+  id: string,
+  data: Partial<Omit<Vehicle, "id" | "customer_id">>,
+): Promise<Vehicle> {
+  await simulateLatency();
+
+  const vehicles = await readData<Vehicle[]>(FILE_NAME);
+  const index = vehicles.findIndex((v) => v.id === id);
+  if (index === -1) {
+    throw new Error("Vehicle not found");
+  }
+
+  const updatedVehicle = { ...vehicles[index], ...data };
+  vehicles[index] = updatedVehicle;
+  await writeData(FILE_NAME, vehicles);
+
+  return updatedVehicle;
+}
+
+import type { Customer } from "../models/Customer";
+import type { JobCard } from "../models/JobCard";
+
+export interface Vehicle360 {
+  vehicle: Vehicle;
+  customer: Customer | null;
+  jobs: JobCard[];
+}
+
+export async function getVehicle360(vehicleId: string): Promise<Vehicle360 | null> {
+  await simulateLatency();
+  const vehicles = await readData<Vehicle[]>(FILE_NAME);
+  const vehicle = vehicles.find((v) => v.id === vehicleId);
+  if (!vehicle) return null;
+
+  const customers = await readData<Customer[]>("customers.json");
+  const customer = customers.find((c) => c.id === vehicle.customer_id) || null;
+
+  const allJobs = await readData<JobCard[]>("jobs.json");
+  const jobs = allJobs
+    .filter((j) => j.vehicle_id === vehicleId)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  return { vehicle, customer, jobs };
+}

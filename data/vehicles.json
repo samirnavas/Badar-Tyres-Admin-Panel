@@ -6,7 +6,12 @@
     "manufacturer": "Hyundai",
     "model": "i20",
     "registration_number": "MH-01-AB-1234",
-    "next_service_date": "2026-12-01T00:00:00Z"
+    "next_service_date": "2026-12-01T00:00:00Z",
+    "insurance_expiry": null,
+    "pollution_expiry": null,
+    "chassis_number": "",
+    "engine_number": "",
+    "color": ""
   },
   {
     "id": "veh_2",
@@ -15,7 +20,12 @@
     "manufacturer": "Maruti Suzuki",
     "model": "Swift",
     "registration_number": "DL-01-CD-5678",
-    "next_service_date": "2026-11-15T00:00:00Z"
+    "next_service_date": "2026-11-15T00:00:00Z",
+    "insurance_expiry": null,
+    "pollution_expiry": null,
+    "chassis_number": "",
+    "engine_number": "",
+    "color": ""
   },
   {
     "customer_id": "b6b2acfd-c100-43d6-a95a-04e2d0a685c0",
@@ -24,7 +34,12 @@
     "model": "Ameo",
     "registration_number": "KL-18-T-2660",
     "next_service_date": "2026-12-13T07:24:45.782Z",
-    "id": "b282e1a1-3880-4926-8ef7-ad897bbbf637"
+    "id": "b282e1a1-3880-4926-8ef7-ad897bbbf637",
+    "insurance_expiry": "2026-06-14",
+    "pollution_expiry": "2027-07-22",
+    "chassis_number": "",
+    "engine_number": "",
+    "color": "silver"
   },
   {
     "customer_id": "b6b2acfd-c100-43d6-a95a-04e2d0a685c0",
@@ -33,6 +48,11 @@
     "model": "Jupiter",
     "registration_number": "KL-77-A-2745",
     "next_service_date": null,
-    "id": "c83c3e9b-1aee-499d-b520-9baedc2f4560"
+    "id": "c83c3e9b-1aee-499d-b520-9baedc2f4560",
+    "insurance_expiry": null,
+    "pollution_expiry": null,
+    "chassis_number": "",
+    "engine_number": "",
+    "color": ""
   }
 ]

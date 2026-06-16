@@ -151,32 +151,203 @@ export async function updateJobStatus(
   const vehicle = vehicleIndex !== -1 ? vehicles[vehicleIndex] : null;
 
   return { ...jobCard, customer, vehicle };
+  return { ...jobCard, customer, vehicle };
+}
+
+export type Timeframe = "today" | "week" | "month" | "all";
+
+function isWithinTimeframe(dateStr: string, timeframe: Timeframe): boolean {
+  if (timeframe === "all") return true;
+
+  const date = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (timeframe === "today") {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    return d.getTime() === today.getTime();
+  }
+
+  if (timeframe === "week") {
+    const weekAgo = new Date(today);
+    weekAgo.setDate(today.getDate() - 7);
+    return date.getTime() >= weekAgo.getTime();
+  }
+
+  if (timeframe === "month") {
+    const monthAgo = new Date(today);
+    monthAgo.setMonth(today.getMonth() - 1);
+    return date.getTime() >= monthAgo.getTime();
+  }
+
+  return true;
 }
 
 /**
  * Calculates key metrics for the dashboard.
  */
-export async function getDashboardMetrics() {
+export async function getDashboardMetrics(timeframe: Timeframe = "today") {
   await simulateLatency();
 
   const jobs = await readData<JobCard[]>(FILE_NAME);
-  const todayStr = new Date().toISOString().split("T")[0];
 
-  let todaysRevenue = 0;
+  let revenue = 0;
   let pendingJobs = 0;
   let completedJobs = 0;
 
   for (const job of jobs) {
+    if (!isWithinTimeframe(job.created_at, timeframe) && !isWithinTimeframe(job.updated_at, timeframe)) {
+      continue;
+    }
+
     if (job.status === "Draft" || job.status === "In Progress") {
       pendingJobs++;
     } else if (job.status === "Completed" || job.status === "Invoiced") {
       completedJobs++;
-    }
-
-    if (job.status === "Invoiced" && job.created_at.startsWith(todayStr)) {
-      todaysRevenue += job.total_amount;
+      if (job.status === "Invoiced") {
+        revenue += job.total_amount;
+      }
     }
   }
 
-  return { todaysRevenue, pendingJobs, completedJobs };
+  return { revenue, pendingJobs, completedJobs };
+}
+
+export interface ServiceAnalytics {
+  topByVolume: { name: string; volume: number }[];
+  topByRevenue: { name: string; revenue: number }[];
+  averageTicketSize: number;
+}
+
+/**
+ * Calculates service performance metrics.
+ */
+export async function getServiceAnalytics(timeframe: Timeframe = "today"): Promise<ServiceAnalytics> {
+  await simulateLatency();
+
+  const jobs = await readData<JobCard[]>(FILE_NAME);
+  // Also load services in case we need to fallback for older jobs
+  const servicesData = await readData<any[]>("services.json");
+  const serviceMap = new Map(servicesData.map((s) => [s.id, s]));
+
+  const validJobs = jobs.filter(
+    (job) =>
+      (job.status === "Completed" || job.status === "Invoiced") &&
+      (isWithinTimeframe(job.created_at, timeframe) ||
+        isWithinTimeframe(job.updated_at, timeframe))
+  );
+
+  let totalRevenue = 0;
+  const volumeMap = new Map<string, number>();
+  const revenueMap = new Map<string, number>();
+
+  for (const job of validJobs) {
+    totalRevenue += job.total_amount;
+
+    if (job.service_items && job.service_items.length > 0) {
+      // New format with full details
+      for (const item of job.service_items) {
+        const qty = item.qty || 1;
+        const rate = item.rate || 0;
+
+        volumeMap.set(item.name, (volumeMap.get(item.name) || 0) + qty);
+        revenueMap.set(item.name, (revenueMap.get(item.name) || 0) + rate * qty);
+      }
+    } else if (job.service_item_ids && job.service_item_ids.length > 0) {
+      // Old format fallback: assume qty=1 and lookup rate
+      for (const serviceId of job.service_item_ids) {
+        const service = serviceMap.get(serviceId);
+        if (service) {
+          volumeMap.set(service.name, (volumeMap.get(service.name) || 0) + 1);
+          revenueMap.set(
+            service.name,
+            (revenueMap.get(service.name) || 0) + (service.price || 0)
+          );
+        }
+      }
+    }
+  }
+
+  const topByVolume = Array.from(volumeMap.entries())
+    .map(([name, volume]) => ({ name, volume }))
+    .sort((a, b) => b.volume - a.volume)
+    .slice(0, 5);
+
+  const topByRevenue = Array.from(revenueMap.entries())
+    .map(([name, revenue]) => ({ name, revenue }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5);
+
+  const averageTicketSize =
+    validJobs.length > 0 ? totalRevenue / validJobs.length : 0;
+
+  return {
+    topByVolume,
+    topByRevenue,
+    averageTicketSize,
+  };
+}
+
+export interface RevenueTrendData {
+  name: string;
+  revenue: number;
+}
+
+export async function getRevenueTrend(timeframe: Timeframe = "week"): Promise<RevenueTrendData[]> {
+  await simulateLatency();
+  const jobs = await readData<JobCard[]>(FILE_NAME);
+
+  const validJobs = jobs.filter(
+    (job) =>
+      (job.status === "Invoiced" || job.status === "Completed") &&
+      (isWithinTimeframe(job.created_at, timeframe) ||
+        isWithinTimeframe(job.updated_at, timeframe))
+  );
+
+  const buckets: { [key: string]: number } = {};
+  const now = new Date();
+
+  if (timeframe === "today") {
+    for (let i = 0; i <= now.getHours(); i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), i, 0, 0);
+      buckets[d.toLocaleTimeString("en-US", { hour: "numeric", hour12: true })] = 0;
+    }
+  } else if (timeframe === "week") {
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      buckets[d.toLocaleDateString("en-US", { weekday: "short" })] = 0;
+    }
+  } else if (timeframe === "month") {
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      buckets[d.toLocaleDateString("en-US", { month: "short", day: "numeric" })] = 0;
+    }
+  } else if (timeframe === "all") {
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets[d.toLocaleDateString("en-US", { month: "short", year: "2-digit" })] = 0;
+    }
+  }
+
+  for (const job of validJobs) {
+    const date = new Date(job.created_at);
+    let key = "";
+    if (timeframe === "today") {
+      key = date.toLocaleTimeString("en-US", { hour: "numeric", hour12: true });
+    } else if (timeframe === "week") {
+      key = date.toLocaleDateString("en-US", { weekday: "short" });
+    } else if (timeframe === "month") {
+      key = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    } else if (timeframe === "all") {
+      key = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+    }
+
+    if (buckets[key] !== undefined) {
+      buckets[key] += job.total_amount;
+    } else {
+      buckets[key] = job.total_amount;
+    }
+  }
+
+  return Object.entries(buckets).map(([name, revenue]) => ({ name, revenue }));
 }

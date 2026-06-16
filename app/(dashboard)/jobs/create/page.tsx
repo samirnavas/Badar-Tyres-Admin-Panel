@@ -175,6 +175,11 @@ function CreateJobForm() {
           manufacturer: values.manufacturer ?? "",
           model: values.model ?? "",
           registration_number: values.registration_number ?? "",
+          insurance_expiry: values.insurance_expiry ?? null,
+          pollution_expiry: values.pollution_expiry ?? null,
+          chassis_number: values.chassis_number ?? "",
+          engine_number: values.engine_number ?? "",
+          color: values.color ?? "",
           next_service_date: null,
         });
         vehicleId = newVehicle.id;
@@ -186,6 +191,12 @@ function CreateJobForm() {
         assigned_technician_id: values.assigned_technician_id,
         status: "In Progress",
         service_item_ids: values.services.map((s) => s.service_id),
+        service_items: values.services.map((s) => ({
+          service_id: s.service_id,
+          name: s.name,
+          qty: s.qty,
+          rate: s.rate,
+        })),
         subtotal: totals.subtotal,
         total_tax: totals.tax,
         total_amount: grandTotal,
@@ -491,12 +502,8 @@ function CreateJobForm() {
                           options={manufacturerOptions}
                           value={field.value ?? ""}
                           onChange={field.onChange}
-                          placeholder={
-                            !vehicleType
-                              ? "Select a vehicle type first"
-                              : "Select manufacturer..."
-                          }
-                          disabled={!vehicleType || manufacturersQuery.isLoading}
+                          placeholder="Select manufacturer..."
+                          disabled={manufacturersQuery.isLoading}
                           className={inputClass(!!errors.manufacturer)}
                           emptyMessage="No manufacturers"
                         />
@@ -527,6 +534,46 @@ function CreateJobForm() {
                         inputClass(!!errors.registration_number),
                         "uppercase",
                       )}
+                    />
+                  </Field>
+
+                  <Field label="Chassis Number" error={errors.chassis_number?.message}>
+                    <input
+                      {...register("chassis_number")}
+                      placeholder="e.g. MA123..."
+                      className={inputClass(!!errors.chassis_number)}
+                    />
+                  </Field>
+
+                  <Field label="Engine Number" error={errors.engine_number?.message}>
+                    <input
+                      {...register("engine_number")}
+                      placeholder="e.g. 1TR..."
+                      className={inputClass(!!errors.engine_number)}
+                    />
+                  </Field>
+
+                  <Field label="Color" error={errors.color?.message}>
+                    <input
+                      {...register("color")}
+                      placeholder="e.g. Pearl White"
+                      className={inputClass(!!errors.color)}
+                    />
+                  </Field>
+
+                  <Field label="Insurance Expiry" error={errors.insurance_expiry?.message}>
+                    <input
+                      type="date"
+                      {...register("insurance_expiry")}
+                      className={inputClass(!!errors.insurance_expiry)}
+                    />
+                  </Field>
+
+                  <Field label="Pollution Expiry" error={errors.pollution_expiry?.message}>
+                    <input
+                      type="date"
+                      {...register("pollution_expiry")}
+                      className={inputClass(!!errors.pollution_expiry)}
                     />
                   </Field>
                 </>

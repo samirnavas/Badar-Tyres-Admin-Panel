@@ -1,6 +1,8 @@
 "use server";
 
 import type { Customer } from "../models/Customer";
+import type { Vehicle } from "../models/Vehicle";
+import type { JobCard } from "../models/JobCard";
 import { readData, writeData } from "../db";
 import { generateId } from "../generateId";
 import { simulateLatency } from "./delay";
@@ -43,4 +45,65 @@ export async function createCustomer(
   await writeData(FILE_NAME, customers);
 
   return customer;
+}
+
+export interface CustomerListWithLTV {
+  customer: Customer;
+  ltv: number;
+}
+
+export async function getCustomersListWithLTV(): Promise<CustomerListWithLTV[]> {
+  await simulateLatency();
+
+  const customers = await readData<Customer[]>(FILE_NAME);
+  const jobs = await readData<JobCard[]>("jobs.json");
+
+  // Group jobs by customer to compute LTV efficiently
+  const ltvMap = new Map<string, number>();
+  for (const job of jobs) {
+    if (job.status === "Completed" || job.status === "Invoiced") {
+      const current = ltvMap.get(job.customer_id) ?? 0;
+      ltvMap.set(job.customer_id, current + job.total_amount);
+    }
+  }
+
+  return customers.map((customer) => ({
+    customer,
+    ltv: ltvMap.get(customer.id) ?? 0,
+  }));
+}
+
+export interface Customer360 {
+  customer: Customer;
+  vehicles: Vehicle[];
+  jobs: JobCard[];
+  ltv: number;
+}
+
+export async function getCustomer360(customerId: string): Promise<Customer360 | null> {
+  await simulateLatency();
+
+  const customers = await readData<Customer[]>(FILE_NAME);
+  const customer = customers.find((c) => c.id === customerId);
+  if (!customer) return null;
+
+  const vehicles = await readData<Vehicle[]>("vehicles.json");
+  const customerVehicles = vehicles.filter((v) => v.customer_id === customerId);
+
+  const jobs = await readData<JobCard[]>("jobs.json");
+  const customerJobs = jobs.filter((j) => j.customer_id === customerId);
+
+  const ltv = customerJobs.reduce((sum, job) => {
+    if (job.status === "Completed" || job.status === "Invoiced") {
+      return sum + job.total_amount;
+    }
+    return sum;
+  }, 0);
+
+  return {
+    customer,
+    vehicles: customerVehicles,
+    jobs: customerJobs,
+    ltv,
+  };
 }

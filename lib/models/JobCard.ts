@@ -1,5 +1,12 @@
 export type JobCardStatus = "Draft" | "In Progress" | "Completed" | "Invoiced";
 
+export interface JobCardServiceItem {
+  service_id: string;
+  name: string;
+  qty: number;
+  rate: number;
+}
+
 export interface JobCard {
   id: string;
   customer_id: string;
@@ -7,6 +14,7 @@ export interface JobCard {
   assigned_technician_id: string;
   status: JobCardStatus;
   service_item_ids: string[];
+  service_items?: JobCardServiceItem[];
   subtotal: number;
   total_tax: number;
   total_amount: number;

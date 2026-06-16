@@ -139,7 +139,7 @@ export function Combobox({
               minWidth: Math.max(coords.width, 200),
               maxWidth: "90vw",
             }}
-            className="z-50 max-h-60 overflow-auto rounded-xl border border-white/40 bg-white/70 py-1 shadow-xl shadow-gray-900/10 backdrop-blur-xl backdrop-saturate-150 focus:outline-none [color-scheme:light]"
+            className="z-[70] max-h-60 overflow-auto rounded-xl border border-white/40 bg-white/70 py-1 shadow-xl shadow-gray-900/10 backdrop-blur-xl backdrop-saturate-150 focus:outline-none [color-scheme:light]"
           >
             {filtered.length === 0 ? (
               onCreateNew && query.trim() ? (

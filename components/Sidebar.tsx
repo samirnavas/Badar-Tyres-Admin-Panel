@@ -19,7 +19,7 @@ const navItems = [
   { label: "Services", href: "/services", icon: Wrench },
   { label: "Job Cards", href: "/jobs", icon: FileText },
   { label: "Billing", href: "/billing", icon: Receipt },
-  { label: "Users Management", href: "/users", icon: Users },
+  { label: "CRM", href: "/users", icon: Users },
   { label: "Vehicle Fleet Logs", href: "/vehicles", icon: Truck },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

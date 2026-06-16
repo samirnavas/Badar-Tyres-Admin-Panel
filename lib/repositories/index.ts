@@ -2,12 +2,18 @@ export {
   getCustomers,
   getCustomerById,
   createCustomer,
+  getCustomer360,
+  getCustomersListWithLTV,
 } from "./customer_repository";
+export type { Customer360, CustomerListWithLTV } from "./customer_repository";
 export {
   getVehicles,
   getVehicleById,
   getVehiclesByCustomerId,
   createVehicle,
+  updateVehicle,
+  getVehicle360,
+  type Vehicle360,
 } from "./vehicle_repository";
 export { getServices, getServiceById, createService, updateService, deleteService } from "./service_repository";
 export { getUsers, getUserById, getTechnicians } from "./user_repository";
@@ -18,6 +24,8 @@ export {
   createJobCard,
   updateJobStatus,
   getDashboardMetrics,
+  getServiceAnalytics,
+  getRevenueTrend,
 } from "./job_repository";
 export type {
   JobCardWithRelations,
