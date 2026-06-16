@@ -28,9 +28,10 @@ import {
   getTechnicians,
   createJobCard,
   createVehicle,
+  getManufacturers,
+  getSettings,
 } from "@/lib/repositories";
 import type { VehicleType } from "@/lib/models/Vehicle";
-import { useManufacturers } from "@/lib/hooks";
 import { useAuth } from "@/lib/AuthContext";
 import { cn, formatCurrency } from "@/lib/format";
 import { createJobCardSchema, type CreateJobCardForm } from "./schema";
@@ -67,7 +68,16 @@ function CreateJobForm() {
     queryKey: ["technician-users"],
     queryFn: getTechnicians,
   });
-  const manufacturers = useManufacturers();
+  const manufacturersQuery = useQuery({
+    queryKey: ["manufacturers-list"],
+    queryFn: getManufacturers,
+  });
+  const settingsQuery = useQuery({
+    queryKey: ["shop-settings"],
+    queryFn: getSettings,
+  });
+
+  const defaultGstRate = settingsQuery.data?.default_gst_rate ?? 18;
 
   const {
     register,
@@ -96,6 +106,24 @@ function CreateJobForm() {
     control,
     name: "services",
   });
+
+  // Once settings load, if the first service item is still exactly the default
+  // (unmodified) with gst_rate 18, update its gst_rate to the one from settings.
+  useEffect(() => {
+    if (settingsQuery.data?.default_gst_rate) {
+      const firstService = fields[0];
+      if (
+        fields.length === 1 &&
+        !firstService.service_id &&
+        !firstService.name &&
+        firstService.rate === 0 &&
+        firstService.qty === 1 &&
+        firstService.gst_rate === 18
+      ) {
+        setValue("services.0.gst_rate", settingsQuery.data.default_gst_rate);
+      }
+    }
+  }, [settingsQuery.data, fields, setValue]);
 
   const customerId = useWatch({ control, name: "customer_id" });
   const vehicleType = useWatch({ control, name: "vehicleType" });
@@ -196,9 +224,8 @@ function CreateJobForm() {
   );
 
   const manufacturerOptions: ComboboxOption[] = useMemo(() => {
-    const list = vehicleType ? manufacturers.data?.[vehicleType] ?? [] : [];
-    return list.map((m) => ({ value: m, label: m }));
-  }, [manufacturers.data, vehicleType]);
+    return (manufacturersQuery.data ?? []).map((m) => ({ value: m.name, label: m.name }));
+  }, [manufacturersQuery.data]);
 
   const serviceOptions: ComboboxOption[] = useMemo(
     () =>
@@ -469,7 +496,7 @@ function CreateJobForm() {
                               ? "Select a vehicle type first"
                               : "Select manufacturer..."
                           }
-                          disabled={!vehicleType || manufacturers.isLoading}
+                          disabled={!vehicleType || manufacturersQuery.isLoading}
                           className={inputClass(!!errors.manufacturer)}
                           emptyMessage="No manufacturers"
                         />
@@ -574,7 +601,7 @@ function CreateJobForm() {
                       name: "",
                       qty: 1,
                       rate: 0,
-                      gst_rate: 18,
+                      gst_rate: defaultGstRate,
                     })
                   }
                   className="inline-flex items-center gap-1 text-sm font-semibold text-theme-accent transition-colors hover:text-theme-accent-dark"

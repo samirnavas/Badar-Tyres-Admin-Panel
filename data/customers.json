@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "id": "cust_1",
+    "name": "John Doe",
+    "phone": "9876543210",
+    "email": "john@example.com",
+    "address": "123 Main St, Mumbai",
+    "created_at": "2026-06-01T10:00:00Z"
+  },
+  {
+    "id": "cust_2",
+    "name": "Jane Smith",
+    "phone": "9876543211",
+    "email": "jane@example.com",
+    "address": "456 Elm St, Delhi",
+    "created_at": "2026-06-02T11:00:00Z"
+  },
+  {
+    "name": "Samir",
+    "phone": "9446583084",
+    "email": "samirnavas7662@gmail.com",
+    "address": "Edavalath(h), kuttiady po, kozhikode dt, 683508",
+    "id": "b6b2acfd-c100-43d6-a95a-04e2d0a685c0",
+    "created_at": "2026-06-16T07:15:37.440Z"
+  }
+]

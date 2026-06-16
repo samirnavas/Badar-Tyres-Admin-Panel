@@ -1,1 +1,8 @@
-{}
+{
+  "shop_name": "Badar Tyres & Auto Care",
+  "shop_address": "Wayanad Road Koduvally",
+  "contact_phone": "+91 9188954101",
+  "contact_email": "info@badartyres.com",
+  "default_gst_rate": 16,
+  "terms_and_conditions": "This is the terms and conditions."
+}

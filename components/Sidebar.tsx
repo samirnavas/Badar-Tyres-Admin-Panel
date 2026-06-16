@@ -9,14 +9,18 @@ import {
   Users,
   Settings,
   X,
+  Wrench,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/format";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
+  { label: "Services", href: "/services", icon: Wrench },
   { label: "Job Cards", href: "/jobs", icon: FileText },
-  { label: "Vehicle Fleet Logs", href: "/vehicles", icon: Truck },
+  { label: "Billing", href: "/billing", icon: Receipt },
   { label: "Users Management", href: "/users", icon: Users },
+  { label: "Vehicle Fleet Logs", href: "/vehicles", icon: Truck },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -59,35 +63,35 @@ export function Sidebar({
           </button>
         </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-5">
-        {navItems.map(({ label, href, icon: Icon }) => {
-          const isActive =
-            pathname === href ||
-            (href !== "/dashboard" && pathname.startsWith(href));
+        <nav className="flex-1 space-y-1 px-3 py-5">
+          {navItems.map(({ label, href, icon: Icon }) => {
+            const isActive =
+              pathname === href ||
+              (href !== "/dashboard" && pathname.startsWith(href));
 
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-theme-accent-soft text-theme-accent"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-              )}
-            >
-              {isActive && (
-                <span className="absolute right-0 top-1/2 h-6 w-0.5 -translate-y-1/2 rounded-full bg-theme-accent" />
-              )}
-              <Icon
-                className="h-5 w-5 shrink-0"
-                strokeWidth={isActive ? 2.2 : 1.9}
-              />
-              <span>{label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-theme-accent-soft text-theme-accent"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                )}
+              >
+                {isActive && (
+                  <span className="absolute right-0 top-1/2 h-6 w-0.5 -translate-y-1/2 rounded-full bg-theme-accent" />
+                )}
+                <Icon
+                  className="h-5 w-5 shrink-0"
+                  strokeWidth={isActive ? 2.2 : 1.9}
+                />
+                <span>{label}</span>
+              </Link>
+            );
+          })}
+        </nav>
       </aside>
     </>
   );

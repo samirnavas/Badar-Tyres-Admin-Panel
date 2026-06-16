@@ -1,1 +1,34 @@
-[]
+[
+  {
+    "name": "A/C Replacement",
+    "category": "Labor",
+    "price": 1200,
+    "gst_rate": 18,
+    "in_stock": false,
+    "id": "srv_1781593006519_2qba1lt"
+  },
+  {
+    "id": "srv_1",
+    "category": "Alignment",
+    "name": "Wheel Alignment",
+    "price": 500,
+    "gst_rate": 18,
+    "in_stock": true
+  },
+  {
+    "id": "srv_2",
+    "category": "Tyres",
+    "name": "Tyre Change",
+    "price": 250,
+    "gst_rate": 18,
+    "in_stock": true
+  },
+  {
+    "id": "srv_3",
+    "category": "Oil",
+    "name": "Engine Oil Replacement",
+    "price": 1200,
+    "gst_rate": 18,
+    "in_stock": true
+  }
+]

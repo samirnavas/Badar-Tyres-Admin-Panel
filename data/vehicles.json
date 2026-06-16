@@ -1,1 +1,29 @@
-[]
+[
+  {
+    "id": "veh_1",
+    "customer_id": "cust_1",
+    "type": "Car",
+    "manufacturer": "Hyundai",
+    "model": "i20",
+    "registration_number": "MH-01-AB-1234",
+    "next_service_date": "2026-12-01T00:00:00Z"
+  },
+  {
+    "id": "veh_2",
+    "customer_id": "cust_2",
+    "type": "Car",
+    "manufacturer": "Maruti Suzuki",
+    "model": "Swift",
+    "registration_number": "DL-01-CD-5678",
+    "next_service_date": "2026-11-15T00:00:00Z"
+  },
+  {
+    "customer_id": "b6b2acfd-c100-43d6-a95a-04e2d0a685c0",
+    "type": "Car",
+    "manufacturer": "Volkswagen",
+    "model": "Ameo",
+    "registration_number": "KL-18-T-2660",
+    "next_service_date": "2026-12-13T07:24:45.782Z",
+    "id": "b282e1a1-3880-4926-8ef7-ad897bbbf637"
+  }
+]

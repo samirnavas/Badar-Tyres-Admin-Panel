@@ -1,17 +1,19 @@
-"use client";
+export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
 import { Plus, Eye } from "lucide-react";
-import { useVehicles, useJobs } from "@/lib/hooks";
-import { Skeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/format";
-import type { Job, Vehicle } from "@/lib/types";
+import { getVehicles, getCustomers, getJobCards } from "@/lib/repositories";
+import type { Vehicle } from "@/lib/models/Vehicle";
+import type { JobCard } from "@/lib/models/JobCard";
+import type { Customer } from "@/lib/models/Customer";
 
-export default function VehiclesPage() {
-  const vehicles = useVehicles();
-  const jobs = useJobs();
-
-  const allJobs = jobs.data ?? [];
+export default async function VehiclesPage() {
+  const [vehicles, customers, jobs] = await Promise.all([
+    getVehicles(),
+    getCustomers(),
+    getJobCards()
+  ]);
 
   return (
     <div className="space-y-6">
@@ -34,38 +36,23 @@ export default function VehiclesPage() {
       </div>
 
       <div className="space-y-4">
-        {vehicles.isLoading &&
-          Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-44 w-full" />
-          ))}
+        {vehicles.map((vehicle) => (
+          <VehicleCard
+            key={vehicle.id}
+            vehicle={vehicle}
+            customer={customers.find((c) => c.id === vehicle.customer_id) || null}
+            jobs={jobs.filter((j) => j.vehicle_id === vehicle.id)}
+          />
+        ))}
 
-        {vehicles.isError && (
-          <div className="rounded-md border border-theme-accent/30 bg-theme-accent-soft px-5 py-10 text-center text-sm font-medium text-theme-accent">
-            {(vehicles.error as Error)?.message ??
-              "Failed to load fleet catalog. Is the API running?"}
+        {vehicles.length === 0 && (
+          <div className="rounded-md border border-gray-200 bg-white px-5 py-12 text-center text-sm text-gray-500">
+            No registered vehicles yet.
           </div>
         )}
-
-        {!vehicles.isLoading &&
-          !vehicles.isError &&
-          (vehicles.data ?? []).map((vehicle) => (
-            <VehicleCard
-              key={vehicle.vehicleNumber}
-              vehicle={vehicle}
-              jobs={allJobs}
-            />
-          ))}
-
-        {!vehicles.isLoading &&
-          !vehicles.isError &&
-          (vehicles.data ?? []).length === 0 && (
-            <div className="rounded-md border border-gray-200 bg-white px-5 py-12 text-center text-sm text-gray-500">
-              No registered vehicles yet.
-            </div>
-          )}
       </div>
 
-      {!vehicles.isLoading && (vehicles.data ?? []).length > 0 && (
+      {vehicles.length > 0 && (
         <div className="flex justify-center pt-2">
           <button className="rounded-md border border-gray-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 transition-colors hover:bg-gray-50">
             Load Additional Records
@@ -76,14 +63,25 @@ export default function VehiclesPage() {
   );
 }
 
-function VehicleCard({ vehicle, jobs }: { vehicle: Vehicle; jobs: Job[] }) {
-  const vehicleJobs = jobs.filter(
-    (j) => j.vehicleNumber === vehicle.vehicleNumber,
+function VehicleCard({
+  vehicle,
+  customer,
+  jobs,
+}: {
+  vehicle: Vehicle;
+  customer: Customer | null;
+  jobs: JobCard[];
+}) {
+  const jobCount = jobs.length;
+  const sortedJobs = [...jobs].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
-  const jobCount = vehicleJobs.length;
-  const latest = vehicleJobs[0];
+  const latest = sortedJobs[0];
+  
+  const isServiceOverdue =
+    vehicle.next_service_date && new Date(vehicle.next_service_date) < new Date();
   const serviceDue =
-    latest?.status === "delayed" || latest?.status === "pending";
+    latest?.status === "Draft" || latest?.status === "In Progress" || isServiceOverdue;
 
   return (
     <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md border border-gray-200 bg-gray-200 md:grid-cols-[260px_1fr_minmax(220px,1fr)]">
@@ -94,7 +92,7 @@ function VehicleCard({ vehicle, jobs }: { vehicle: Vehicle; jobs: Job[] }) {
             License Plate
           </p>
           <div className="mt-2 inline-block rounded-md border border-gray-300 bg-gray-50 px-4 py-2 text-xl font-bold tracking-wider text-theme-accent">
-            {vehicle.vehicleNumber}
+            {vehicle.registration_number}
           </div>
         </div>
         <div className="mt-4 flex items-center gap-2">
@@ -116,9 +114,9 @@ function VehicleCard({ vehicle, jobs }: { vehicle: Vehicle; jobs: Job[] }) {
           Vehicle Overview
         </p>
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-          <Meta label="Make" value={vehicle.vehicleType || "—"} />
-          <Meta label="Model" value={vehicle.vehicleModel || "—"} />
-          <Meta label="Owner" value={vehicle.customerName || "—"} />
+          <Meta label="Make" value={vehicle.manufacturer || "—"} />
+          <Meta label="Model" value={vehicle.model || "—"} />
+          <Meta label="Owner" value={customer?.name || "—"} />
         </dl>
       </div>
 
@@ -140,11 +138,15 @@ function VehicleCard({ vehicle, jobs }: { vehicle: Vehicle; jobs: Job[] }) {
               serviceDue ? "text-theme-accent" : "text-gray-500",
             )}
           >
-            Last seen: {vehicle.lastJobDate || "—"}
+            Last seen: {latest ? new Date(latest.created_at).toLocaleDateString() : "—"}
           </p>
         </div>
         <Link
-          href={vehicle.lastJobId ? `/jobs/${vehicle.lastJobId}` : `/jobs?search=${encodeURIComponent(vehicle.vehicleNumber)}`}
+          href={
+            latest
+              ? `/jobs/${latest.id}`
+              : `/jobs?search=${encodeURIComponent(vehicle.registration_number)}`
+          }
           className="mt-4 inline-flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-700 transition-colors hover:bg-gray-50"
         >
           <Eye className="h-3.5 w-3.5" /> View Full Profile

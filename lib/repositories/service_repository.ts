@@ -42,3 +42,20 @@ export async function createService(input: CreateServiceInput): Promise<Service>
 
   return newService;
 }
+export async function updateService(id: string, data: Partial<Service>): Promise<Service | null> {
+  await simulateLatency();
+  const services = await readData<Service[]>(FILE_NAME);
+  const index = services.findIndex((s) => s.id === id);
+  if (index === -1) return null;
+
+  services[index] = { ...services[index], ...data };
+  await writeData(FILE_NAME, services);
+  return services[index];
+}
+
+export async function deleteService(id: string): Promise<void> {
+  await simulateLatency();
+  const services = await readData<Service[]>(FILE_NAME);
+  const updated = services.filter((s) => s.id !== id);
+  await writeData(FILE_NAME, updated);
+}

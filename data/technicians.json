@@ -1,12 +1,5 @@
 [
   {
-    "id": "usr_1",
-    "name": "Admin User",
-    "role": "admin",
-    "email": "admin@badartyres.com",
-    "phone": "9999999999"
-  },
-  {
     "id": "usr_2",
     "name": "Ravi Mechanic",
     "role": "technician",
