@@ -35,5 +35,23 @@
     "id": "d6cf1adb-3b0b-4d3c-b07e-c79b8d6a0f5a",
     "created_at": "2026-06-16T07:16:34.562Z",
     "updated_at": "2026-06-16T07:24:45.780Z"
+  },
+  {
+    "customer_id": "b6b2acfd-c100-43d6-a95a-04e2d0a685c0",
+    "vehicle_id": "c83c3e9b-1aee-499d-b520-9baedc2f4560",
+    "assigned_technician_id": "usr_2",
+    "status": "In Progress",
+    "service_item_ids": [
+      "srv_3"
+    ],
+    "subtotal": 1200,
+    "total_tax": 216,
+    "total_amount": 1416,
+    "warranty_end_date": "2030-07-23",
+    "warranty_notes": null,
+    "created_by": "U-001",
+    "id": "f5ab696a-ecdc-42d5-b7e4-020c157c0991",
+    "created_at": "2026-06-16T07:38:38.809Z",
+    "updated_at": "2026-06-16T07:38:38.809Z"
   }
 ]

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   Search,
@@ -234,6 +234,7 @@ function CustomerProfile({
     queryKey: ["jobcards-by-customer", customer.id],
     queryFn: () => getJobCardsByCustomerId(customer.id),
   });
+  const router = useRouter();
 
   return (
     <div className="space-y-5">
@@ -338,7 +339,11 @@ function CustomerProfile({
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {(jobsQuery.data ?? []).map((job) => (
-                  <tr key={job.id} className="transition-colors hover:bg-gray-50">
+                  <tr
+                    key={job.id}
+                    onClick={() => router.push(`/jobs/${job.id}`)}
+                    className="cursor-pointer transition-colors hover:bg-gray-50"
+                  >
                     <td className="px-3 py-3 text-gray-600">
                       {formatDate(job.created_at)}
                     </td>
