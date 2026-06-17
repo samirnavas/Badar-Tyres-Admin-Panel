@@ -1,0 +1,23 @@
+{
+  "Car": [
+    "Toyota",
+    "Honda",
+    "Maruti Suzuki",
+    "Hyundai",
+    "Mercedes-Benz",
+    "Volkswagen",
+    "Kia"
+  ],
+  "Bike": [
+    "Royal Enfield",
+    "TVS",
+    "Honda",
+    "Ather"
+  ],
+  "Others": [
+    "Mahindra",
+    "Tata Motors",
+    "Barath Benz",
+    "Ashok Leyland"
+  ]
+}
