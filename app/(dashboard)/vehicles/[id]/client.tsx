@@ -14,7 +14,7 @@ function checkExpiry(dateString?: string | null): "expired" | "soon" | "ok" | nu
   const target = new Date(dateString);
   const now = new Date();
   const diffDays = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays < 0) return "expired";
   if (diffDays <= 30) return "soon";
   return "ok";
@@ -52,22 +52,6 @@ export default function VehicleProfileClient({ data }: { data: Vehicle360 }) {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Compliance Card */}
-        <div className="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-400" /> Compliance & Expiry
-            </h3>
-            <div className="mt-5 space-y-4">
-              <ExpiryRow label="Insurance" status={insExpiry} date={vehicle.insurance_expiry} />
-              <ExpiryRow label="Pollution" status={polExpiry} date={vehicle.pollution_expiry} />
-              <div className="flex items-center justify-between border-t border-gray-100 pt-4">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500">Next Service</span>
-                <span className="text-sm font-semibold text-gray-900">{vehicle.next_service_date ? formatDate(vehicle.next_service_date) : "Not Set"}</span>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Technical Details Card */}
         <div className="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -85,6 +69,23 @@ export default function VehicleProfileClient({ data }: { data: Vehicle360 }) {
               <div className="space-y-3 border-t border-gray-100 pt-4">
                 <DetailItem label="Chassis No. (VIN)" value={vehicle.chassis_number || "—"} fullWidth />
                 <DetailItem label="Engine No." value={vehicle.engine_number || "—"} fullWidth />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Compliance Card */}
+        <div className="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-400" /> Compliance & Expiry
+            </h3>
+            <div className="mt-5 space-y-4">
+              <ExpiryRow label="Insurance" status={insExpiry} date={vehicle.insurance_expiry} />
+              <ExpiryRow label="Pollution" status={polExpiry} date={vehicle.pollution_expiry} />
+              <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500">Next Service</span>
+                <span className="text-sm font-semibold text-gray-900">{vehicle.next_service_date ? formatDate(vehicle.next_service_date) : "Not Set"}</span>
               </div>
             </div>
           </div>
@@ -139,10 +140,10 @@ export default function VehicleProfileClient({ data }: { data: Vehicle360 }) {
             href={`/jobs/create?customer=${vehicle.customer_id}`}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 shadow-sm"
           >
-             New Job Card
+            New Job Card
           </Link>
         </div>
-        
+
         {jobs.length === 0 ? (
           <div className="p-12 text-center text-sm text-gray-500">
             No service history found for this vehicle.
@@ -151,18 +152,22 @@ export default function VehicleProfileClient({ data }: { data: Vehicle360 }) {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                <th className="px-6 py-3">Job</th>
                 <th className="px-6 py-3">Date</th>
                 <th className="px-6 py-3">Status</th>
                 <th className="px-6 py-3 text-right">Total</th>
-                <th className="px-6 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
               {jobs.map((job) => (
                 <tr
                   key={job.id}
-                  className="transition-colors hover:bg-gray-50"
+                  onClick={() => router.push(`/jobs/${job.id}`)}
+                  className="transition-colors hover:bg-gray-50 cursor-pointer"
                 >
+                  <td className="px-6 py-4 font-medium text-gray-900">
+                    {job.service_items?.[0]?.name ?? "Service"}
+                  </td>
                   <td className="px-6 py-4 font-medium text-gray-900">
                     {formatDate(job.created_at)}
                   </td>
@@ -171,14 +176,6 @@ export default function VehicleProfileClient({ data }: { data: Vehicle360 }) {
                   </td>
                   <td className="px-6 py-4 text-right font-bold text-gray-900 tabular-nums">
                     ₹{formatCurrency(job.total_amount)}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <Link
-                      href={`/jobs/${job.id}`}
-                      className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-widest text-theme-accent hover:text-theme-accent-dark"
-                    >
-                      View Job
-                    </Link>
                   </td>
                 </tr>
               ))}

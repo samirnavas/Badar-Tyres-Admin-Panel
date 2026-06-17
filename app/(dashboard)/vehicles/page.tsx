@@ -31,7 +31,7 @@ export default async function VehiclesPage() {
           href="/jobs/create"
           className="inline-flex items-center gap-2 rounded-md bg-theme-accent px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-theme-accent-dark"
         >
-          <Plus className="h-4 w-4" /> Instantly Initialize New Job Card Workflow
+          <Plus className="h-4 w-4" /> New Job Card
         </Link>
       </div>
 
@@ -77,7 +77,7 @@ function VehicleCard({
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
   const latest = sortedJobs[0];
-  
+
   const isServiceOverdue =
     vehicle.next_service_date && new Date(vehicle.next_service_date) < new Date();
   const serviceDue =

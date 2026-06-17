@@ -25,7 +25,7 @@ function checkExpiry(dateString?: string | null): "expired" | "soon" | "ok" | nu
   const target = new Date(dateString);
   const now = new Date();
   const diffDays = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays < 0) return "expired";
   if (diffDays <= 30) return "soon";
   return "ok";
@@ -73,8 +73,8 @@ export default function CustomerProfileClient({ data }: { data: Customer360 }) {
                     customer.customer_type === "Corporate"
                       ? "bg-blue-50 text-blue-700"
                       : customer.customer_type === "Fleet"
-                      ? "bg-purple-50 text-purple-700"
-                      : "bg-gray-100 text-gray-700"
+                        ? "bg-purple-50 text-purple-700"
+                        : "bg-gray-100 text-gray-700"
                   )}
                 >
                   {customer.customer_type || "Retail"}
@@ -95,7 +95,7 @@ export default function CustomerProfileClient({ data }: { data: Customer360 }) {
               )}
             </div>
           </div>
-          
+
           <div className="flex w-full flex-col gap-4 sm:w-auto sm:flex-row sm:items-center">
             <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 sm:min-w-[160px]">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
@@ -201,8 +201,8 @@ export default function CustomerProfileClient({ data }: { data: Customer360 }) {
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-200">
-                        <th className="px-5 py-3">Date</th>
                         <th className="px-5 py-3">Vehicle</th>
+                        <th className="px-5 py-3">Date</th>
                         <th className="px-5 py-3">Status</th>
                         <th className="px-5 py-3 text-right">Total</th>
                       </tr>
@@ -216,11 +216,11 @@ export default function CustomerProfileClient({ data }: { data: Customer360 }) {
                             onClick={() => router.push(`/jobs/${job.id}`)}
                             className="cursor-pointer transition-colors hover:bg-gray-50"
                           >
-                            <td className="px-5 py-3 font-medium text-gray-900">
-                              {formatDate(job.created_at)}
-                            </td>
                             <td className="px-5 py-3 text-gray-600">
                               {v ? `${v.manufacturer} ${v.model} (${v.registration_number})` : "Unknown Vehicle"}
+                            </td>
+                            <td className="px-5 py-3 font-medium text-gray-900">
+                              {formatDate(job.created_at)}
                             </td>
                             <td className="px-5 py-3">
                               <StatusBadge status={job.status} />
@@ -285,8 +285,8 @@ function VehicleCard({ vehicle, onEdit }: { vehicle: Vehicle; onEdit: () => void
 
   return (
     <div className="group flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:border-theme-accent/30 relative">
-      <button 
-        onClick={onEdit} 
+      <button
+        onClick={onEdit}
         className="absolute right-4 top-4 hidden items-center justify-center rounded-md border border-gray-200 bg-white p-1.5 text-gray-500 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900 group-hover:flex z-10"
         title="Edit Vehicle"
       >

@@ -1,20 +1,25 @@
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";
-import { Search, RefreshCw, Menu, LogOut, ChevronDown } from "lucide-react";
+import { Search, RefreshCw, Menu, LogOut, ChevronDown, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     setSearchQuery(searchParams.get("search") || "");
-  }, [searchParams]);
+    if (pathname === "/search") {
+      setIsSearching(false);
+    }
+  }, [searchParams, pathname]);
 
   const name = user?.name || "Workshop Manager";
   const initials = name
@@ -26,10 +31,11 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
+    setIsSearching(true);
     if (searchQuery.trim()) {
-      router.push(`/jobs?search=${encodeURIComponent(searchQuery.trim())}`);
+      router.push(`/search?search=${encodeURIComponent(searchQuery.trim())}`);
     } else {
-      router.push(`/jobs`);
+      router.push(`/search`);
     }
   };
 
@@ -45,13 +51,19 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
       </button>
 
       <form onSubmit={handleSearch} className="relative flex-1 max-w-xl">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        {isSearching ? (
+          <Loader2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-theme-accent" />
+        ) : (
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        )}
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search orders, clients, or vehicles..."
-          className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-theme-accent focus:bg-white focus:outline-none focus:ring-1 focus:ring-theme-accent"
+          disabled={isSearching}
+          aria-busy={isSearching}
+          className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-theme-accent focus:bg-white focus:outline-none focus:ring-1 focus:ring-theme-accent disabled:opacity-70"
         />
       </form>
 
