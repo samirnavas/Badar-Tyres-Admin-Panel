@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { User } from "./types";
+import { clearSession, loadSession, persistSession } from "./auth-storage";
 
 interface AuthState {
   token: string | null;
@@ -9,7 +10,7 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (token: string, user: User) => void;
+  login: (token: string, user: User, rememberMe?: boolean) => void;
   logout: () => void;
   isInitialized: boolean;
 }
@@ -24,34 +25,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    // Initialize state from localStorage
-    const storedToken = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
-
-    if (storedToken && storedUser) {
-      try {
-        setState({
-          token: storedToken,
-          user: JSON.parse(storedUser),
-        });
-      } catch (e) {
-        // Handle invalid JSON
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-      }
+    const session = loadSession();
+    if (session) {
+      setState(session);
     }
     setIsInitialized(true);
   }, []);
 
-  const login = (token: string, user: User) => {
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(user));
+  const login = (token: string, user: User, rememberMe = true) => {
+    persistSession(token, user, rememberMe);
     setState({ token, user });
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    clearSession(false);
     setState({ token: null, user: null });
   };
 

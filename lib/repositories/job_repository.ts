@@ -77,6 +77,24 @@ export async function getJobCardById(
 }
 
 /**
+ * Returns all job cards with their Customer and Vehicle joined in.
+ */
+export async function getRecentJobsWithRelations(): Promise<JobCardWithRelations[]> {
+  await simulateLatency();
+  const jobs = await readData<JobCard[]>(FILE_NAME);
+  const customers = await readData<Customer[]>(CUSTOMERS_FILE);
+  const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
+  
+  return jobs
+    .map(job => {
+      const customer = customers.find(c => c.id === job.customer_id) ?? null;
+      const vehicle = vehicles.find(v => v.id === job.vehicle_id) ?? null;
+      return { ...job, customer, vehicle };
+    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+/**
  * Creates a new job card and returns the persisted record.
  *
  * Security: the `created_by` field (referencing the acting User.id) is

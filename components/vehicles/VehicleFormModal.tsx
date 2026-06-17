@@ -11,6 +11,7 @@ import { createVehicle, updateVehicle, getManufacturers } from "@/lib/repositori
 import type { Vehicle, VehicleType } from "@/lib/models/Vehicle";
 import { cn } from "@/lib/format";
 import { Combobox } from "@/components/ui/Combobox";
+import { useRouter } from "next/navigation";
 
 const vehicleSchema = z.object({
   type: z.enum(["Car", "Bike", "Others"]),
@@ -38,6 +39,7 @@ export function VehicleFormModal({
   vehicleToEdit?: Vehicle | null;
 }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const {
     register,
@@ -103,6 +105,7 @@ export function VehicleFormModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vehicles-by-customer", customerId] });
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+      router.refresh();
       onClose();
     },
   });

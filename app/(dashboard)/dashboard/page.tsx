@@ -14,9 +14,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
-import { useJobs } from "@/lib/hooks";
 import { useQuery } from "@tanstack/react-query";
-import { getDashboardMetrics, getServiceAnalytics } from "@/lib/repositories";
+import { getDashboardMetrics, getServiceAnalytics, getRecentJobsWithRelations } from "@/lib/repositories";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ServiceAnalyticsWidget } from "@/components/dashboard/ServiceAnalyticsWidget";
 import { RevenueChartWidget } from "@/components/dashboard/RevenueChartWidget";
@@ -24,7 +23,7 @@ import { UpcomingServicesWidget } from "@/components/dashboard/UpcomingServicesW
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatCurrency, cn } from "@/lib/format";
-import type { Job } from "@/lib/types";
+import type { JobCardWithRelations } from "@/lib/repositories";
 import type { Timeframe } from "@/lib/repositories/job_repository";
 
 export default function DashboardPage() {
@@ -39,7 +38,10 @@ export default function DashboardPage() {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
-  const jobs = useJobs();
+  const jobsQuery = useQuery({
+    queryKey: ["recentJobsWithRelations"],
+    queryFn: () => getRecentJobsWithRelations(),
+  });
   
   const dashboardMetricsQuery = useQuery({
     queryKey: ["dashboardMetrics", timeframe],
@@ -51,10 +53,10 @@ export default function DashboardPage() {
     queryFn: () => getServiceAnalytics(timeframe),
   });
 
-  const recent = (jobs.data ?? []).slice(0, 5);
+  const recent = (jobsQuery.data ?? []).slice(0, 5);
 
-  const activeJobs = (jobs.data ?? []).filter((j) => j.status === "running");
-  const blockedJobs = (jobs.data ?? []).filter((j) => j.status === "delayed");
+  const activeJobs = (jobsQuery.data ?? []).filter((j) => j.status === "In Progress");
+  const blockedJobs = (jobsQuery.data ?? []).filter((j) => j.status === "Draft");
 
   return (
     <div className="space-y-6">
@@ -159,7 +161,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {jobs.isLoading
+                {jobsQuery.isLoading
                   ? Array.from({ length: 5 }).map((_, i) => (
                       <tr key={i}>
                         {Array.from({ length: 5 }).map((__, j) => (
@@ -170,7 +172,7 @@ export default function DashboardPage() {
                       </tr>
                     ))
                   : recent.map((job) => {
-                      const isDelayed = job.status === "delayed";
+                      const isDelayed = job.status === "Draft";
                       return (
                         <tr
                           key={job.id}
@@ -181,24 +183,24 @@ export default function DashboardPage() {
                               isDelayed ? "text-theme-accent" : "text-gray-900"
                             }`}
                           >
-                            {job.jobNumber}
+                            {job.id.slice(0, 8).toUpperCase()}
                           </td>
                           <td className="px-5 py-4 text-gray-900">
-                            {job.customerName}
+                            {job.customer?.name ?? "Unknown"}
                           </td>
                           <td className="px-5 py-4 text-gray-600">
-                            {job.services[0]?.name ?? "—"}
+                            {job.service_items?.[0]?.name ?? job.vehicle?.model ?? "—"}
                           </td>
                           <td className="px-5 py-4">
                             <StatusBadge status={job.status} />
                           </td>
                           <td className="px-5 py-4 text-right font-medium text-gray-900">
-                            ₹ {formatCurrency(job.grandTotal)}
+                            ₹ {formatCurrency(job.total_amount)}
                           </td>
                         </tr>
                       );
                     })}
-                {!jobs.isLoading && recent.length === 0 && (
+                {!jobsQuery.isLoading && recent.length === 0 && (
                   <tr>
                     <td
                       colSpan={5}
@@ -213,7 +215,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="block lg:hidden divide-y divide-gray-100">
-            {jobs.isLoading ? (
+            {jobsQuery.isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="p-4">
                   <Skeleton className="h-16 w-full" />
@@ -222,7 +224,7 @@ export default function DashboardPage() {
             ) : (
               recent.map((job) => <RecentActivityCardMobile key={job.id} job={job} />)
             )}
-            {!jobs.isLoading && recent.length === 0 && (
+            {!jobsQuery.isLoading && recent.length === 0 && (
               <div className="px-5 py-10 text-center text-sm text-gray-500">
                 No recent activity to show.
               </div>
@@ -246,7 +248,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-5 p-5">
-              {jobs.isLoading ? (
+              {jobsQuery.isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-20 w-full" />
                 ))
@@ -257,8 +259,9 @@ export default function DashboardPage() {
                       key={job.id}
                       bay={i + 1}
                       state="active"
-                      title={`${job.customerName} (${job.jobNumber})`}
-                      subtitle={job.services[0]?.name ?? job.vehicleModel}
+                      title={`${job.customer?.name ?? "Unknown"} (${job.id.slice(0, 8).toUpperCase()})`}
+                      subtitle={job.service_items?.[0]?.name ?? job.vehicle?.model ?? "—"}
+                      href={`/jobs/${job.id}`}
                     />
                   ))}
                   {blockedJobs.slice(0, 1).map((job) => (
@@ -266,8 +269,9 @@ export default function DashboardPage() {
                       key={job.id}
                       bay={activeJobs.slice(0, 2).length + 1}
                       state="blocked"
-                      title={`${job.customerName} (${job.jobNumber})`}
-                      subtitle={job.delay ? `Delayed · ${job.delay}` : "Awaiting parts delivery."}
+                      title={`${job.customer?.name ?? "Unknown"} (${job.id.slice(0, 8).toUpperCase()})`}
+                      subtitle={"Awaiting processing"}
+                      href={`/jobs/${job.id}`}
                     />
                   ))}
                   <BaySlot
@@ -291,11 +295,13 @@ function BaySlot({
   state,
   title,
   subtitle,
+  href,
 }: {
   bay: number;
   state: "active" | "blocked" | "available";
   title?: string;
   subtitle?: string;
+  href?: string;
 }) {
   const meta = {
     active: { dot: "bg-emerald-500", label: "Active" },
@@ -319,6 +325,16 @@ function BaySlot({
         >
           + Assign Next Job
         </Link>
+      ) : href ? (
+        <Link href={href} className="block rounded-md border border-gray-200 p-3 transition-colors hover:border-theme-accent hover:bg-theme-accent-soft/20 cursor-pointer">
+          <p className="text-sm font-semibold text-gray-900">{title}</p>
+          <p className="mt-0.5 text-xs text-gray-600">{subtitle}</p>
+          {state === "active" && (
+            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-gray-100">
+              <div className="h-full w-2/3 rounded-full bg-amber-500" />
+            </div>
+          )}
+        </Link>
       ) : (
         <div className="rounded-md border border-gray-200 p-3">
           <p className="text-sm font-semibold text-gray-900">{title}</p>
@@ -334,25 +350,25 @@ function BaySlot({
   );
 }
 
-function RecentActivityCardMobile({ job }: { job: Job }) {
-  const isDelayed = job.status === "delayed";
+function RecentActivityCardMobile({ job }: { job: JobCardWithRelations }) {
+  const isDelayed = job.status === "Draft";
   return (
     <div className={cn("p-4 border-b border-gray-100", isDelayed ? "bg-theme-accent-soft/40" : "bg-white")}>
       <div className="flex justify-between items-start mb-3">
         <div>
           <div className={`font-semibold ${isDelayed ? "text-theme-accent" : "text-gray-900"}`}>
-            {job.jobNumber}
+            {job.id.slice(0, 8).toUpperCase()}
           </div>
-          <div className="text-sm text-gray-900 mt-0.5">{job.customerName}</div>
+          <div className="text-sm text-gray-900 mt-0.5">{job.customer?.name ?? "Unknown"}</div>
         </div>
         <StatusBadge status={job.status} />
       </div>
       <div className="flex justify-between items-end text-sm">
         <div className="text-gray-600">
-          {job.services[0]?.name ?? "—"}
+          {job.service_items?.[0]?.name ?? job.vehicle?.model ?? "—"}
         </div>
         <div className="font-medium text-gray-900">
-          ₹ {formatCurrency(job.grandTotal)}
+          ₹ {formatCurrency(job.total_amount)}
         </div>
       </div>
     </div>

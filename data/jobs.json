@@ -53,5 +53,38 @@
     "id": "f5ab696a-ecdc-42d5-b7e4-020c157c0991",
     "created_at": "2026-06-16T07:38:38.809Z",
     "updated_at": "2026-06-16T07:38:38.809Z"
+  },
+  {
+    "customer_id": "5d1b95b3-770a-43f8-a765-c3dcda115990",
+    "vehicle_id": "5cc027fc-f45a-4f48-9c47-f987810adf75",
+    "assigned_technician_id": "usr_1781679447284",
+    "status": "Completed",
+    "service_item_ids": [
+      "srv_1781686215338_6r2h0fa",
+      "srv_1781686131620_e4xunlc"
+    ],
+    "service_items": [
+      {
+        "service_id": "srv_1781686215338_6r2h0fa",
+        "name": "Alloy Wheel Fitting",
+        "qty": 2,
+        "rate": 1100
+      },
+      {
+        "service_id": "srv_1781686131620_e4xunlc",
+        "name": "Tyre Fitting",
+        "qty": 2,
+        "rate": 600
+      }
+    ],
+    "subtotal": 3400,
+    "total_tax": 612,
+    "total_amount": 4012,
+    "warranty_end_date": "2026-12-30",
+    "warranty_notes": "6 months on wheel",
+    "created_by": "U-001",
+    "id": "b3723bff-b8b2-4d82-b51b-dacd4f33f091",
+    "created_at": "2026-06-17T08:57:08.967Z",
+    "updated_at": "2026-06-17T09:20:47.546Z"
   }
 ]

@@ -7,6 +7,7 @@ import {
   defaultShouldDehydrateQuery,
 } from "@tanstack/react-query";
 import { AuthProvider } from "@/lib/AuthContext";
+import { PWARegister } from "@/components/PWARegister";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -27,7 +28,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>{children}</AuthProvider>
+      <AuthProvider>
+        {children}
+        <PWARegister />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

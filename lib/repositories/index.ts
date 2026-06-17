@@ -26,6 +26,7 @@ export {
   getDashboardMetrics,
   getServiceAnalytics,
   getRevenueTrend,
+  getRecentJobsWithRelations,
 } from "./job_repository";
 export type {
   JobCardWithRelations,

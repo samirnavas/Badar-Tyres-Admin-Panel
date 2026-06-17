@@ -9,11 +9,16 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
+import {
+  getSavedCredentials,
+  saveLoginCredentials,
+} from "@/lib/auth-storage";
 import { Loader2, User as UserIcon, Lock, Eye, EyeOff } from "lucide-react";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
+  rememberMe: z.boolean(),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -23,9 +28,8 @@ export default function LoginPage() {
   const { login, user, isInitialized } = useAuth();
   const [errorMsg, setErrorMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [credentialsReady, setCredentialsReady] = useState(false);
 
-  // If an authenticated admin lands on /login (e.g. after a refresh), send
-  // them straight to the dashboard.
   useEffect(() => {
     if (isInitialized && user?.role === "admin") {
       router.replace("/dashboard");
@@ -35,19 +39,45 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    reset,
+    watch,
     formState: { errors },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+      rememberMe: true,
+    },
   });
 
+  useEffect(() => {
+    const saved = getSavedCredentials();
+    reset({
+      username: saved?.username ?? "",
+      password: saved?.password ?? "",
+      rememberMe: saved?.rememberMe ?? true,
+    });
+    setCredentialsReady(true);
+  }, [reset]);
+
+  const rememberMe = watch("rememberMe");
+
   const loginMutation = useMutation({
-    mutationFn: api.login,
-    onSuccess: (data) => {
+    mutationFn: ({ username, password }: LoginForm) =>
+      api.login({ username, password }),
+    onSuccess: (data, variables) => {
       if (data.user.role !== "admin") {
         setErrorMsg("Access denied. Admin privileges required.");
         return;
       }
-      login(data.token, data.user);
+
+      saveLoginCredentials(
+        variables.username,
+        variables.password,
+        variables.rememberMe,
+      );
+      login(data.token, data.user, variables.rememberMe);
       router.replace("/dashboard");
     },
     onError: (err: Error) => {
@@ -60,9 +90,16 @@ export default function LoginPage() {
     loginMutation.mutate(data);
   };
 
+  if (!credentialsReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex">
-      {/* Left Half - Background Image */}
       <div className="hidden lg:flex lg:w-[55%] relative">
         <Image
           src="/login_bg.png"
@@ -73,10 +110,8 @@ export default function LoginPage() {
         />
       </div>
 
-      {/* Right Half - Login Form */}
       <div className="w-full lg:w-[45%] flex items-center justify-center bg-white px-8 py-12">
         <div className="w-full max-w-[420px]">
-          {/* Logo */}
           <div className="mb-12">
             <Image
               src="/badar_logo_black.svg"
@@ -88,10 +123,11 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Heading */}
           <div className="mb-8">
             <h1 className="text-[1.35rem] font-bold text-gray-900 mb-2">Welcome Back</h1>
-            <p className="text-gray-500 text-[15px]">Please login to your account to continue.</p>
+            <p className="text-gray-500 text-[15px]">
+              Sign in to your workshop admin account.
+            </p>
           </div>
 
           {errorMsg && (
@@ -100,8 +136,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            {/* USER NAME */}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" autoComplete="on">
             <div>
               <label
                 className="block text-xs font-medium uppercase tracking-wider text-gray-700 mb-1.5"
@@ -114,6 +149,7 @@ export default function LoginPage() {
                 <input
                   id="username"
                   type="text"
+                  autoComplete="username"
                   className="w-full border border-gray-300 rounded-lg py-3 pl-11 pr-4 text-[15px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-theme-accent focus:ring-1 focus:ring-theme-accent transition-colors"
                   placeholder="Enter your username"
                   {...register("username")}
@@ -124,7 +160,6 @@ export default function LoginPage() {
               )}
             </div>
 
-            {/* PASSWORD */}
             <div>
               <label
                 className="block text-xs font-medium uppercase tracking-wider text-gray-700 mb-1.5"
@@ -137,6 +172,7 @@ export default function LoginPage() {
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
                   className="w-full border border-gray-300 rounded-lg py-3 pl-11 pr-11 text-[15px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-theme-accent focus:ring-1 focus:ring-theme-accent transition-colors"
                   placeholder="••••••••"
                   {...register("password")}
@@ -145,6 +181,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
                     <EyeOff className="w-5 h-5" strokeWidth={1.5} />
@@ -158,21 +195,20 @@ export default function LoginPage() {
               )}
             </div>
 
-            {/* Options */}
             <div className="flex items-center justify-between pt-1 pb-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   className="rounded border-gray-300 w-4 h-4 text-theme-accent focus:ring-theme-accent"
+                  {...register("rememberMe")}
                 />
                 <span className="text-[14px] text-gray-500">Remember me</span>
               </label>
-              <a href="#" className="text-[14px] text-theme-accent font-medium hover:text-theme-accent-dark transition-colors">
-                Forgot Password?
-              </a>
+              {!rememberMe && (
+                <span className="text-[12px] text-gray-400">Session only on this device</span>
+              )}
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loginMutation.isPending}
@@ -183,10 +219,9 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Footer */}
           <div className="mt-16 pt-8 border-t border-gray-100 text-center">
             <p className="text-[11px] tracking-[0.15em] text-gray-400 uppercase font-medium">
-              Internal Use Only <span className="mx-2">•</span> Build 2.4.1
+              Internal Use Only <span className="mx-2">•</span> PWA Build 2.5.0
             </p>
           </div>
         </div>

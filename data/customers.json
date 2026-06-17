@@ -34,5 +34,19 @@
     "customer_type": "Retail",
     "tags": [],
     "notes": ""
+  },
+  {
+    "name": "Steven",
+    "phone": "7564267742",
+    "email": "steven@gmail.com",
+    "address": "Koduvally , Kozhikode",
+    "gst_number": "27AADCB2230M1Z2",
+    "customer_type": "Retail",
+    "tags": [
+      "VIP"
+    ],
+    "notes": "this is a manager note",
+    "id": "5d1b95b3-770a-43f8-a765-c3dcda115990",
+    "created_at": "2026-06-17T08:54:16.502Z"
   }
 ]

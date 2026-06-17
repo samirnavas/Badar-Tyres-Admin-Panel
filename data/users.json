@@ -12,5 +12,26 @@
     "role": "technician",
     "email": "ravi@badartyres.com",
     "phone": "8888888888"
+  },
+  {
+    "name": "George",
+    "role": "technician",
+    "email": "george@badartyres.com",
+    "phone": "+91 9496952004",
+    "id": "usr_1781679447284"
+  },
+  {
+    "name": "Badar",
+    "role": "admin",
+    "email": "badar@badartyres.com",
+    "phone": "+91 9846508631",
+    "id": "usr_1781679513113"
+  },
+  {
+    "name": "David",
+    "role": "agent",
+    "email": "david@gmail.com",
+    "phone": "+91 9446583084",
+    "id": "usr_1781679568344"
   }
 ]

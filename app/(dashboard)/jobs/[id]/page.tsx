@@ -10,6 +10,7 @@ import {
   CarFront,
   CheckCircle2,
   FileText,
+  ExternalLink,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -205,11 +206,18 @@ export default function JobPreviewPage({
         <div className="space-y-6">
           {/* Customer Details */}
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
-                <User className="h-5 w-5" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
+                  <User className="h-5 w-5" />
+                </div>
+                <h3 className="font-semibold text-gray-900">Customer Details</h3>
               </div>
-              <h3 className="font-semibold text-gray-900">Customer Details</h3>
+              {jobCard.customer_id && (
+                <Link href={`/users/${jobCard.customer_id}`} className="flex items-center gap-1 text-xs font-semibold text-theme-accent hover:text-theme-accent-dark hover:underline">
+                  Profile <ExternalLink className="h-3 w-3" />
+                </Link>
+              )}
             </div>
             <div className="space-y-3">
               <div>
@@ -231,11 +239,18 @@ export default function JobPreviewPage({
 
           {/* Vehicle Details */}
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
-                <CarFront className="h-5 w-5" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
+                  <CarFront className="h-5 w-5" />
+                </div>
+                <h3 className="font-semibold text-gray-900">Vehicle Details</h3>
               </div>
-              <h3 className="font-semibold text-gray-900">Vehicle Details</h3>
+              {jobCard.vehicle_id && (
+                <Link href={`/vehicles/${jobCard.vehicle_id}`} className="flex items-center gap-1 text-xs font-semibold text-theme-accent hover:text-theme-accent-dark hover:underline">
+                  Profile <ExternalLink className="h-3 w-3" />
+                </Link>
+              )}
             </div>
             <div className="space-y-3">
               <div>

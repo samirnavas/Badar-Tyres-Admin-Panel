@@ -21,7 +21,7 @@
     "model": "Swift",
     "registration_number": "DL-01-CD-5678",
     "next_service_date": "2026-11-15T00:00:00Z",
-    "insurance_expiry": null,
+    "insurance_expiry": "2026-06-19",
     "pollution_expiry": null,
     "chassis_number": "",
     "engine_number": "",
@@ -37,7 +37,7 @@
     "id": "b282e1a1-3880-4926-8ef7-ad897bbbf637",
     "insurance_expiry": "2026-06-14",
     "pollution_expiry": "2027-07-22",
-    "chassis_number": "",
+    "chassis_number": "MA284H2824HS3",
     "engine_number": "",
     "color": "silver"
   },
@@ -54,5 +54,19 @@
     "chassis_number": "",
     "engine_number": "",
     "color": ""
+  },
+  {
+    "customer_id": "5d1b95b3-770a-43f8-a765-c3dcda115990",
+    "type": "Car",
+    "manufacturer": "Toyota",
+    "model": "vellfire",
+    "registration_number": "KL 77 C 8055",
+    "insurance_expiry": "2030-07-31",
+    "pollution_expiry": "2026-07-17",
+    "chassis_number": "MA8374NS82NK9",
+    "engine_number": "EN9462BD9J9",
+    "color": "white",
+    "next_service_date": "2026-12-14T09:20:47.548Z",
+    "id": "5cc027fc-f45a-4f48-9c47-f987810adf75"
   }
 ]

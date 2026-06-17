@@ -1,6 +1,102 @@
 [
   {
-    "name": "A/C Replacement",
+    "name": "Insurance",
+    "category": "Labor",
+    "price": 400,
+    "gst_rate": 18,
+    "in_stock": true,
+    "id": "srv_1781686313669_xruq31a"
+  },
+  {
+    "name": "Pollution Test",
+    "category": "Labor",
+    "price": 0,
+    "gst_rate": 18,
+    "in_stock": true,
+    "id": "srv_1781686280175_vtnzdvp"
+  },
+  {
+    "name": "Nitrogen Air Fitting",
+    "category": "Labor",
+    "price": 600,
+    "gst_rate": 18,
+    "in_stock": true,
+    "id": "srv_1781686263469_8nbod9c"
+  },
+  {
+    "name": "Other A/C Services",
+    "category": "Labor",
+    "price": 500,
+    "gst_rate": 18,
+    "in_stock": true,
+    "id": "srv_1781686253080_gpaoozf"
+  },
+  {
+    "name": "Alloy Wheel Fitting",
+    "category": "Parts",
+    "price": 1100,
+    "gst_rate": 18,
+    "in_stock": false,
+    "id": "srv_1781686215338_6r2h0fa"
+  },
+  {
+    "name": "Patch Work",
+    "category": "Tyres",
+    "price": 200,
+    "gst_rate": 18,
+    "in_stock": true,
+    "id": "srv_1781686199991_j61tqkr"
+  },
+  {
+    "name": "Puncher Work",
+    "category": "Tyres",
+    "price": 500,
+    "gst_rate": 18,
+    "in_stock": true,
+    "id": "srv_1781686187736_7pot4de"
+  },
+  {
+    "name": "Neck Change",
+    "category": "Tyres",
+    "price": 500,
+    "gst_rate": 18,
+    "in_stock": true,
+    "id": "srv_1781686160749_w7nm5j3"
+  },
+  {
+    "name": "Tube Change",
+    "category": "Tyres",
+    "price": 800,
+    "gst_rate": 18,
+    "in_stock": true,
+    "id": "srv_1781686147269_r1yuq4k"
+  },
+  {
+    "name": "Tyre Fitting",
+    "category": "Tyres",
+    "price": 600,
+    "gst_rate": 18,
+    "in_stock": true,
+    "id": "srv_1781686131620_e4xunlc"
+  },
+  {
+    "name": "Tyre Rotation",
+    "category": "Tyres",
+    "price": 600,
+    "gst_rate": 18,
+    "in_stock": true,
+    "id": "srv_1781686115627_lptsz6c"
+  },
+  {
+    "name": "Wheel Balancing",
+    "category": "Alignment",
+    "price": 500,
+    "gst_rate": 18,
+    "in_stock": true,
+    "id": "srv_1781686100543_e0hs8gj"
+  },
+  {
+    "name": "A/C Gas Services",
     "category": "Labor",
     "price": 1200,
     "gst_rate": 18,

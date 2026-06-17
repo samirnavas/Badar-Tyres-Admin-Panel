@@ -78,7 +78,7 @@ app.patch('/api/users/:id', (req, res) => {
 
   user.role = role;
   persistUsers();
-  
+
   const { password, ...safeUser } = user;
   res.json(safeUser);
 });
@@ -86,10 +86,10 @@ app.patch('/api/users/:id', (req, res) => {
 app.delete('/api/users/:id', (req, res) => {
   const index = users.findIndex((u) => u.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: 'User not found' });
-  
+
   const deletedUser = users.splice(index, 1)[0];
   persistUsers();
-  
+
   const { password, ...safeUser } = deletedUser;
   res.json(safeUser);
 });

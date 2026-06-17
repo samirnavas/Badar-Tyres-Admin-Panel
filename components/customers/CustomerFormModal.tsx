@@ -10,6 +10,7 @@ import { X, Loader2, UserPlus } from "lucide-react";
 import { createCustomer } from "@/lib/repositories";
 import type { Customer } from "@/lib/models/Customer";
 import { cn } from "@/lib/format";
+import { useRouter } from "next/navigation";
 
 const customerSchema = z.object({
   name: z.string().min(1, "Full name is required"),
@@ -43,6 +44,7 @@ export function CustomerFormModal({
   initialName?: string;
 }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const {
     register,
@@ -100,6 +102,7 @@ export function CustomerFormModal({
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       onCreated?.(customer);
       onSuccess?.(customer.id);
+      router.refresh();
       onClose();
     },
   });
