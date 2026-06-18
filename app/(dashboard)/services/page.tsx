@@ -14,15 +14,15 @@ export default async function ServicesPage() {
       <ServicesHeader />
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+        <div className="w-full overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                 <th className="px-6 py-3.5">Name</th>
                 <th className="px-6 py-3.5">Category</th>
-                <th className="px-6 py-3.5 text-right">Price</th>
+                <th className="px-6 py-3.5 text-right whitespace-nowrap">Price</th>
                 <th className="px-6 py-3.5 text-right">GST Rate</th>
-                <th className="px-6 py-3.5 text-center">Status</th>
+                <th className="px-6 py-3.5 text-center whitespace-nowrap">Status</th>
                 <th className="px-6 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
@@ -38,13 +38,13 @@ export default async function ServicesPage() {
                 <tr key={service.id} className="transition-colors hover:bg-gray-50">
                   <td className="px-6 py-4 font-medium text-gray-900">{service.name}</td>
                   <td className="px-6 py-4 text-gray-600">{service.category}</td>
-                  <td className="px-6 py-4 text-right text-gray-900 tabular-nums">
+                  <td className="px-6 py-4 text-right text-gray-900 tabular-nums whitespace-nowrap">
                     ₹ {formatCurrency(service.price)}
                   </td>
                   <td className="px-6 py-4 text-right text-gray-600 tabular-nums">
                     {service.gst_rate}%
                   </td>
-                  <td className="px-6 py-4 text-center">
+                  <td className="px-6 py-4 text-center whitespace-nowrap">
                     <span
                       className={cn(
                         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold",

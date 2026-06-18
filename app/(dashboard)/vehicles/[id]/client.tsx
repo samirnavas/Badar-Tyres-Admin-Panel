@@ -150,15 +150,16 @@ export default function VehicleProfileClient({ data }: { data: Vehicle360 }) {
             No service history found for this vehicle.
           </div>
         ) : (
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-200">
-                <th className="px-6 py-3">Job</th>
-                <th className="px-6 py-3">Date</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3 text-right">Total</th>
-              </tr>
-            </thead>
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                  <th className="px-6 py-3">Job</th>
+                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3 whitespace-nowrap">Status</th>
+                  <th className="px-6 py-3 text-right whitespace-nowrap">Total</th>
+                </tr>
+              </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
               {jobs.map((job) => (
                 <tr
@@ -172,16 +173,17 @@ export default function VehicleProfileClient({ data }: { data: Vehicle360 }) {
                   <td className="px-6 py-4 font-medium text-gray-900">
                     {formatDate(job.created_at)}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={job.status} />
                   </td>
-                  <td className="px-6 py-4 text-right font-bold text-gray-900 tabular-nums">
+                  <td className="px-6 py-4 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
                     ₹{formatCurrency(job.total_amount)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

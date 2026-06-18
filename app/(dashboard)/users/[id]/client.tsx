@@ -274,7 +274,7 @@ function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: strin
     <div className="flex items-center gap-3 px-5 py-3.5">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-gray-500 border border-gray-100">{icon}</div>
       <dt className="w-24 shrink-0 text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</dt>
-      <dd className="text-sm font-semibold text-gray-900 truncate">{value}</dd>
+      <dd className="text-sm font-semibold text-gray-900 break-all">{value}</dd>
     </div>
   );
 }
