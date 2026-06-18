@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { X, UserPlus } from "lucide-react";
 import { createUser } from "@/lib/repositories/user_repository";
 import { cn } from "@/lib/format";
+import { Combobox } from "@/components/ui/Combobox";
 
 const userSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -104,19 +105,27 @@ export function AddUserModal({ open, onClose }: { open: boolean; onClose: () => 
               <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                 Role *
               </label>
-              <select
-                {...register("role")}
-                className={cn(
-                  "w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-1",
-                  errors.role
-                    ? "border-theme-accent focus:border-theme-accent focus:ring-theme-accent"
-                    : "border-gray-200 focus:border-theme-accent focus:ring-theme-accent"
+              <Controller
+                control={control}
+                name="role"
+                render={({ field }) => (
+                  <Combobox
+                    options={[
+                      { value: "technician", label: "Technician" },
+                      { value: "admin", label: "Admin" },
+                      { value: "agent", label: "Agent" },
+                    ]}
+                    value={field.value}
+                    onChange={field.onChange}
+                    className={cn(
+                      errors.role
+                        ? "border-theme-accent focus:border-theme-accent focus:ring-theme-accent"
+                        : "border-gray-200 focus:border-theme-accent focus:ring-theme-accent"
+                    )}
+                    placeholder="Select role..."
+                  />
                 )}
-              >
-                <option value="technician">Technician</option>
-                <option value="admin">Admin</option>
-                <option value="agent">Agent</option>
-              </select>
+              />
               {errors.role && <p className="mt-1 text-xs text-theme-accent">{errors.role.message}</p>}
             </div>
 

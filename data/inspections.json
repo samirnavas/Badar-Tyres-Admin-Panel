@@ -1,0 +1,64 @@
+[
+  {
+    "id": "insp_job_1",
+    "jobId": "job_1",
+    "technicianId": "usr_2",
+    "vehicleId": "veh_1",
+    "createdAt": "2026-06-16T11:15:00.000Z",
+    "status": "Submitted",
+    "inspectionItems": [
+      {
+        "system": "Front Tyres",
+        "condition": "Yellow",
+        "notes": "Tread depth at 3mm — recommend replacement soon.",
+        "photoUrl": null
+      },
+      {
+        "system": "Rear Tyres",
+        "condition": "Green",
+        "notes": "Even wear, good tread depth.",
+        "photoUrl": null
+      },
+      {
+        "system": "Brake Pads",
+        "condition": "Red",
+        "notes": "Front pads worn to 2mm. Immediate replacement advised.",
+        "photoUrl": null
+      },
+      {
+        "system": "Oil Level",
+        "condition": "Green",
+        "notes": "Within normal range.",
+        "photoUrl": null
+      },
+      {
+        "system": "Battery",
+        "condition": "Yellow",
+        "notes": "Terminal corrosion noted. CCA test borderline.",
+        "photoUrl": null
+      }
+    ]
+  },
+  {
+    "id": "insp_f5ab696a",
+    "jobId": "f5ab696a-ecdc-42d5-b7e4-020c157c0991",
+    "technicianId": "usr_2",
+    "vehicleId": "c83c3e9b-1aee-499d-b520-9baedc2f4560",
+    "createdAt": "2026-06-16T08:00:00.000Z",
+    "status": "Reviewed",
+    "inspectionItems": [
+      {
+        "system": "Alignment",
+        "condition": "Yellow",
+        "notes": "Slight toe-out detected on front axle.",
+        "photoUrl": null
+      },
+      {
+        "system": "Suspension",
+        "condition": "Green",
+        "notes": "No play in bushings or joints.",
+        "photoUrl": null
+      }
+    ]
+  }
+]

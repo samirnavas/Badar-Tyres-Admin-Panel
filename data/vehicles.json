@@ -66,7 +66,35 @@
     "chassis_number": "MA8374NS82NK9",
     "engine_number": "EN9462BD9J9",
     "color": "white",
-    "next_service_date": "2026-12-14T09:20:47.548Z",
+    "next_service_date": "2026-12-15T07:00:45.892Z",
     "id": "5cc027fc-f45a-4f48-9c47-f987810adf75"
+  },
+  {
+    "customer_id": "cust_2",
+    "type": "Bike",
+    "manufacturer": "TVS",
+    "model": "Jive",
+    "registration_number": "KL 18 F 5765",
+    "insurance_expiry": "2029-01-17",
+    "pollution_expiry": "2026-06-19",
+    "chassis_number": "MA8374N354J2NK9",
+    "engine_number": "EN9463BD9J9",
+    "color": "yellow",
+    "next_service_date": "2026-12-15T07:01:38.967Z",
+    "id": "4bb2bce2-aea1-4dbd-ab42-84fde4049f1a"
+  },
+  {
+    "customer_id": "5aa6e58d-ca22-4d7f-807d-97a46f39753a",
+    "type": "Car",
+    "manufacturer": "Honda",
+    "model": "Civic",
+    "registration_number": "KL 33 C 1501",
+    "insurance_expiry": "2026-06-19",
+    "pollution_expiry": "2031-10-28",
+    "chassis_number": "HAN3583NW9N",
+    "engine_number": "JAESI395H5DF",
+    "color": "purple",
+    "next_service_date": "2026-12-15T07:39:27.093Z",
+    "id": "6220608a-919c-41e6-8d4f-bbd43bb2de5f"
   }
 ]

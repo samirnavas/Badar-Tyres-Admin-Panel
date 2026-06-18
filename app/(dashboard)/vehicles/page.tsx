@@ -6,6 +6,7 @@ import { cn } from "@/lib/format";
 import { getVehicles, getCustomers, getJobCards } from "@/lib/repositories";
 import type { Vehicle } from "@/lib/models/Vehicle";
 import type { JobCard } from "@/lib/models/JobCard";
+import { normalizeJobStatus } from "@/lib/models/JobCard";
 import type { Customer } from "@/lib/models/Customer";
 
 export default async function VehiclesPage() {
@@ -81,7 +82,10 @@ function VehicleCard({
   const isServiceOverdue =
     vehicle.next_service_date && new Date(vehicle.next_service_date) < new Date();
   const serviceDue =
-    latest?.status === "Draft" || latest?.status === "In Progress" || isServiceOverdue;
+    normalizeJobStatus(latest?.status ?? "") === "Estimate" ||
+    normalizeJobStatus(latest?.status ?? "") === "Approved" ||
+    normalizeJobStatus(latest?.status ?? "") === "In Progress" ||
+    isServiceOverdue;
 
   return (
     <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md border border-gray-200 bg-gray-200 md:grid-cols-[260px_1fr_minmax(220px,1fr)]">

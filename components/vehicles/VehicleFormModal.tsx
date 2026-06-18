@@ -178,14 +178,23 @@ export function VehicleFormModal({
           className="space-y-4 p-5"
         >
           <Field label="Vehicle Type" error={errors.type?.message}>
-            <select
-              {...register("type")}
-              className={inputClass(!!errors.type)}
-            >
-              <option value="Car">Car</option>
-              <option value="Bike">Bike</option>
-              <option value="Others">Others</option>
-            </select>
+            <Controller
+              control={control}
+              name="type"
+              render={({ field }) => (
+                <Combobox
+                  options={[
+                    { value: "Car", label: "Car" },
+                    { value: "Bike", label: "Bike" },
+                    { value: "Others", label: "Others" },
+                  ]}
+                  value={field.value}
+                  onChange={field.onChange}
+                  className={inputClass(!!errors.type)}
+                  placeholder="Select vehicle type..."
+                />
+              )}
+            />
           </Field>
 
           <Field label="Manufacturer" error={errors.manufacturer?.message}>
@@ -228,17 +237,25 @@ export function VehicleFormModal({
 
           <Field label="Chassis Number (Optional)" error={errors.chassis_number?.message}>
             <input
-              {...register("chassis_number")}
+              {...register("chassis_number", {
+                onChange: (e) => {
+                  e.target.value = e.target.value.toUpperCase();
+                },
+              })}
               placeholder="e.g. MA123..."
-              className={inputClass(!!errors.chassis_number)}
+              className={cn(inputClass(!!errors.chassis_number), "uppercase")}
             />
           </Field>
 
           <Field label="Engine Number (Optional)" error={errors.engine_number?.message}>
             <input
-              {...register("engine_number")}
+              {...register("engine_number", {
+                onChange: (e) => {
+                  e.target.value = e.target.value.toUpperCase();
+                },
+              })}
               placeholder="e.g. 1TR..."
-              className={inputClass(!!errors.engine_number)}
+              className={cn(inputClass(!!errors.engine_number), "uppercase")}
             />
           </Field>
 

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { getDashboardMetrics, getServiceAnalytics, getRecentJobsWithRelations } from "@/lib/repositories";
+import { getDashboardMetrics, getServiceAnalytics, getRecentJobsWithRelations, getBays } from "@/lib/repositories";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ServiceAnalyticsWidget } from "@/components/dashboard/ServiceAnalyticsWidget";
 import { RevenueChartWidget } from "@/components/dashboard/RevenueChartWidget";
@@ -25,6 +25,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { formatCurrency, cn } from "@/lib/format";
 import type { JobCardWithRelations } from "@/lib/repositories";
 import type { Timeframe } from "@/lib/repositories/job_repository";
+import { normalizeJobStatus, getJobPrimaryLineLabel, getJobBayId } from "@/lib/models/JobCard";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -53,10 +54,31 @@ export default function DashboardPage() {
     queryFn: () => getServiceAnalytics(timeframe),
   });
 
+  const baysQuery = useQuery({
+    queryKey: ["bays"],
+    queryFn: getBays,
+  });
+
   const recent = (jobsQuery.data ?? []).slice(0, 5);
 
-  const activeJobs = (jobsQuery.data ?? []).filter((j) => j.status === "In Progress");
-  const blockedJobs = (jobsQuery.data ?? []).filter((j) => j.status === "Draft");
+  const baySlots = useMemo(() => {
+    const bays = baysQuery.data ?? [];
+    const jobs = jobsQuery.data ?? [];
+    return bays.map((bay) => {
+      const bayJobs = jobs.filter((job) => {
+        return (
+          getJobBayId(job) === bay.id &&
+          (normalizeJobStatus(job.status) === "In Progress" ||
+           normalizeJobStatus(job.status) === "Approved")
+        );
+      });
+
+      const activeJob = bayJobs.find(j => normalizeJobStatus(j.status) === "In Progress") || bayJobs[0];
+      const queuedCount = activeJob ? bayJobs.length - 1 : 0;
+
+      return { bay, activeJob, queuedCount };
+    });
+  }, [baysQuery.data, jobsQuery.data]);
 
   return (
     <div className="space-y-6">
@@ -172,7 +194,7 @@ export default function DashboardPage() {
                       </tr>
                     ))
                   : recent.map((job) => {
-                      const isDelayed = job.status === "Draft";
+                      const isDelayed = normalizeJobStatus(job.status) === "Estimate";
                       return (
                         <tr
                           key={job.id}
@@ -189,7 +211,9 @@ export default function DashboardPage() {
                             {job.customer?.name ?? "Unknown"}
                           </td>
                           <td className="px-5 py-4 text-gray-600">
-                            {job.service_items?.[0]?.name ?? job.vehicle?.model ?? "—"}
+                            {getJobPrimaryLineLabel(job) !== "—"
+                              ? getJobPrimaryLineLabel(job)
+                              : (job.vehicle?.model ?? "—")}
                           </td>
                           <td className="px-5 py-4">
                             <StatusBadge status={job.status} />
@@ -248,38 +272,51 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-5 p-5">
-              {jobsQuery.isLoading ? (
+              {jobsQuery.isLoading || baysQuery.isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-20 w-full" />
                 ))
               ) : (
                 <>
-                  {activeJobs.slice(0, 2).map((job, i) => (
-                    <BaySlot
-                      key={job.id}
-                      bay={i + 1}
-                      state="active"
-                      title={`${job.customer?.name ?? "Unknown"} (${job.id.slice(0, 8).toUpperCase()})`}
-                      subtitle={job.service_items?.[0]?.name ?? job.vehicle?.model ?? "—"}
-                      href={`/jobs/${job.id}`}
-                    />
-                  ))}
-                  {blockedJobs.slice(0, 1).map((job) => (
-                    <BaySlot
-                      key={job.id}
-                      bay={activeJobs.slice(0, 2).length + 1}
-                      state="blocked"
-                      title={`${job.customer?.name ?? "Unknown"} (${job.id.slice(0, 8).toUpperCase()})`}
-                      subtitle={"Awaiting processing"}
-                      href={`/jobs/${job.id}`}
-                    />
-                  ))}
-                  <BaySlot
-                    bay={
-                      activeJobs.slice(0, 2).length + blockedJobs.slice(0, 1).length + 1
+                  {baySlots.map(({ bay, activeJob, queuedCount }, i) => {
+                    let state: "active" | "blocked" | "available" = "available";
+                    let title = "Available";
+                    let subtitle = "Ready for the next job";
+                    let href = undefined;
+
+                    if (bay.status === "Occupied") {
+                      state = "active";
+                      if (activeJob) {
+                        title = `${activeJob.customer?.name ?? "Unknown"} (${activeJob.id.slice(0, 8).toUpperCase()})`;
+                        subtitle =
+                          getJobPrimaryLineLabel(activeJob) !== "—"
+                            ? getJobPrimaryLineLabel(activeJob)
+                            : (activeJob.vehicle?.model ?? "—");
+                        if (queuedCount > 0) {
+                          subtitle += ` • +${queuedCount} in queue`;
+                        }
+                        href = `/jobs/${activeJob.id}`;
+                      } else {
+                        title = "Occupied (No Active Job)";
+                        subtitle = "Marked as occupied but no job found";
+                      }
+                    } else if (bay.status === "Maintenance") {
+                      state = "blocked";
+                      title = "Maintenance";
+                      subtitle = "Bay is temporarily unavailable";
                     }
-                    state="available"
-                  />
+
+                    return (
+                      <BaySlot
+                        key={bay.id}
+                        bayName={bay.name}
+                        state={state}
+                        title={title}
+                        subtitle={subtitle}
+                        href={href}
+                      />
+                    );
+                  })}
                 </>
               )}
             </div>
@@ -291,13 +328,13 @@ export default function DashboardPage() {
 }
 
 function BaySlot({
-  bay,
+  bayName,
   state,
   title,
   subtitle,
   href,
 }: {
-  bay: number;
+  bayName: string;
   state: "active" | "blocked" | "available";
   title?: string;
   subtitle?: string;
@@ -315,7 +352,7 @@ function BaySlot({
         className={`absolute left-0 top-1 h-3 w-3 rounded-full ${meta.dot}`}
       />
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-        Bay {bay} · {meta.label}
+        {bayName} · {meta.label}
       </p>
 
       {state === "available" ? (
@@ -351,7 +388,7 @@ function BaySlot({
 }
 
 function RecentActivityCardMobile({ job }: { job: JobCardWithRelations }) {
-  const isDelayed = job.status === "Draft";
+  const isDelayed = normalizeJobStatus(job.status) === "Estimate";
   return (
     <div className={cn("p-4 border-b border-gray-100", isDelayed ? "bg-theme-accent-soft/40" : "bg-white")}>
       <div className="flex justify-between items-start mb-3">
@@ -365,7 +402,9 @@ function RecentActivityCardMobile({ job }: { job: JobCardWithRelations }) {
       </div>
       <div className="flex justify-between items-end text-sm">
         <div className="text-gray-600">
-          {job.service_items?.[0]?.name ?? job.vehicle?.model ?? "—"}
+          {getJobPrimaryLineLabel(job) !== "—"
+            ? getJobPrimaryLineLabel(job)
+            : (job.vehicle?.model ?? "—")}
         </div>
         <div className="font-medium text-gray-900">
           ₹ {formatCurrency(job.total_amount)}

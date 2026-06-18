@@ -1,12 +1,33 @@
 import { z } from "zod";
 
-export const serviceLineSchema = z.object({
-  service_id: z.string().min(1, "Select a service"),
-  name: z.string().min(1, "Select a service"),
-  qty: z.number({ message: "Min 1" }).min(1, "Min 1"),
-  rate: z.number({ message: "Invalid" }).min(0, "Invalid"),
-  gst_rate: z.number().min(0),
-});
+export const lineItemSchema = z
+  .object({
+    itemKey: z.string().min(1, "Select a service or part"),
+    itemType: z.enum(["service", "part"]),
+    serviceId: z.string().optional(),
+    partId: z.string().optional(),
+    name: z.string().min(1, "Select a service or part"),
+    quantity: z.number({ message: "Min 1" }).min(1, "Min 1"),
+    unitPrice: z.number({ message: "Invalid" }).min(0, "Invalid"),
+    total: z.number({ message: "Invalid" }).min(0, "Invalid"),
+    gst_rate: z.number().min(0),
+  })
+  .superRefine((data, ctx) => {
+    if (data.itemType === "service" && !data.serviceId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["itemKey"],
+        message: "Select a service",
+      });
+    }
+    if (data.itemType === "part" && !data.partId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["itemKey"],
+        message: "Select a part",
+      });
+    }
+  });
 
 export const createJobCardSchema = z
   .object({
@@ -22,12 +43,14 @@ export const createJobCardSchema = z
     chassis_number: z.string().optional(),
     engine_number: z.string().optional(),
     color: z.string().optional(),
-    assigned_technician_id: z.string().min(1, "Assign a lead technician"),
+    assigned_technician_id: z.string().optional(),
+    technicianId: z.string().nullable().optional(),
+    bayId: z.string().nullable().optional(),
     warranty_end_date: z.string().optional(),
     warranty_notes: z.string().optional(),
-    services: z
-      .array(serviceLineSchema)
-      .min(1, "Add at least one service item"),
+    lineItems: z
+      .array(lineItemSchema)
+      .min(1, "Add at least one service or part"),
   })
   .superRefine((data, ctx) => {
     if (!data.vehicle_id) {
@@ -59,4 +82,9 @@ export const createJobCardSchema = z
   });
 
 export type CreateJobCardForm = z.infer<typeof createJobCardSchema>;
-export type ServiceLine = z.infer<typeof serviceLineSchema>;
+export type LineItemForm = z.infer<typeof lineItemSchema>;
+
+/** @deprecated Use lineItemSchema instead. */
+export const serviceLineSchema = lineItemSchema;
+/** @deprecated Use LineItemForm instead. */
+export type ServiceLine = LineItemForm;

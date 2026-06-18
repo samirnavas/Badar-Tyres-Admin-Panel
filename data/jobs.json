@@ -9,14 +9,48 @@
       "srv_1",
       "srv_2"
     ],
-    "subtotal": 750,
-    "total_tax": 135,
-    "total_amount": 885,
+    "subtotal": 200,
+    "total_tax": 36,
+    "total_amount": 236,
     "warranty_end_date": "2026-12-16T00:00:00Z",
     "warranty_notes": "6 months warranty on alignment",
     "created_by": "usr_1",
     "created_at": "2026-06-16T10:00:00Z",
-    "updated_at": "2026-06-16T10:30:00Z"
+    "updated_at": "2026-06-18T07:47:26.609Z",
+    "technicianId": "usr_2",
+    "bayId": null,
+    "line_items": [
+      {
+        "serviceId": "srv_1",
+        "name": "Service",
+        "quantity": 1,
+        "unitPrice": 0,
+        "total": 0
+      },
+      {
+        "serviceId": "srv_2",
+        "name": "Service",
+        "quantity": 1,
+        "unitPrice": 0,
+        "total": 0
+      },
+      {
+        "serviceId": "srv_1781686280175_vtnzdvp",
+        "name": "Pollution Test",
+        "quantity": 1,
+        "unitPrice": 0,
+        "total": 0,
+        "gst_rate": 18
+      },
+      {
+        "serviceId": "srv_1781686199991_j61tqkr",
+        "name": "Patch Work",
+        "quantity": 1,
+        "unitPrice": 200,
+        "total": 200,
+        "gst_rate": 18
+      }
+    ]
   },
   {
     "customer_id": "b6b2acfd-c100-43d6-a95a-04e2d0a685c0",
@@ -44,21 +78,48 @@
     "service_item_ids": [
       "srv_3"
     ],
-    "subtotal": 1200,
-    "total_tax": 216,
-    "total_amount": 1416,
+    "subtotal": 500,
+    "total_tax": 90,
+    "total_amount": 590,
     "warranty_end_date": "2030-07-23",
     "warranty_notes": null,
     "created_by": "U-001",
     "id": "f5ab696a-ecdc-42d5-b7e4-020c157c0991",
     "created_at": "2026-06-16T07:38:38.809Z",
-    "updated_at": "2026-06-16T07:38:38.809Z"
+    "updated_at": "2026-06-17T19:05:43.081Z",
+    "technicianId": "usr_2",
+    "bayId": "bay_2",
+    "line_items": [
+      {
+        "serviceId": "srv_3",
+        "name": "Service",
+        "quantity": 1,
+        "unitPrice": 0,
+        "total": 0
+      },
+      {
+        "serviceId": "srv_1781686253080_gpaoozf",
+        "name": "Other A/C Services",
+        "quantity": 1,
+        "unitPrice": 500,
+        "total": 500,
+        "gst_rate": 18
+      },
+      {
+        "serviceId": "srv_1781686280175_vtnzdvp",
+        "name": "Pollution Test",
+        "quantity": 1,
+        "unitPrice": 0,
+        "total": 0,
+        "gst_rate": 18
+      }
+    ]
   },
   {
     "customer_id": "5d1b95b3-770a-43f8-a765-c3dcda115990",
     "vehicle_id": "5cc027fc-f45a-4f48-9c47-f987810adf75",
     "assigned_technician_id": "usr_1781679447284",
-    "status": "Completed",
+    "status": "Closed",
     "service_item_ids": [
       "srv_1781686215338_6r2h0fa",
       "srv_1781686131620_e4xunlc"
@@ -85,6 +146,130 @@
     "created_by": "U-001",
     "id": "b3723bff-b8b2-4d82-b51b-dacd4f33f091",
     "created_at": "2026-06-17T08:57:08.967Z",
-    "updated_at": "2026-06-17T09:20:47.546Z"
+    "updated_at": "2026-06-17T19:10:09.375Z"
+  },
+  {
+    "customer_id": "5d1b95b3-770a-43f8-a765-c3dcda115990",
+    "vehicle_id": "5cc027fc-f45a-4f48-9c47-f987810adf75",
+    "technicianId": "usr_2",
+    "bayId": "bay_1",
+    "assigned_technician_id": "usr_2",
+    "status": "Completed",
+    "line_items": [
+      {
+        "serviceId": "srv_1781686215338_6r2h0fa",
+        "name": "Alloy Wheel Fitting",
+        "quantity": 1,
+        "unitPrice": 1100,
+        "total": 1100,
+        "gst_rate": 18
+      }
+    ],
+    "subtotal": 1100,
+    "total_tax": 198,
+    "total_amount": 1298,
+    "warranty_end_date": null,
+    "warranty_notes": null,
+    "created_by": "U-001",
+    "id": "37497c6a-abfd-47fb-9413-37493a5a653f",
+    "created_at": "2026-06-17T19:07:29.936Z",
+    "updated_at": "2026-06-18T07:00:45.888Z"
+  },
+  {
+    "customer_id": "cust_2",
+    "vehicle_id": "4bb2bce2-aea1-4dbd-ab42-84fde4049f1a",
+    "technicianId": "usr_1781679447284",
+    "bayId": "bay_1",
+    "assigned_technician_id": "usr_1781679447284",
+    "status": "Completed",
+    "line_items": [
+      {
+        "serviceId": "srv_1781686131620_e4xunlc",
+        "name": "Tyre Fitting",
+        "quantity": 1,
+        "unitPrice": 600,
+        "total": 600,
+        "gst_rate": 16
+      },
+      {
+        "serviceId": "srv_1781686199991_j61tqkr",
+        "name": "Patch Work",
+        "quantity": 1,
+        "unitPrice": 200,
+        "total": 200,
+        "gst_rate": 18
+      }
+    ],
+    "subtotal": 800,
+    "total_tax": 132,
+    "total_amount": 932,
+    "warranty_end_date": null,
+    "warranty_notes": null,
+    "created_by": "U-001",
+    "id": "8cab27f6-55e2-4ccb-bb3d-01d40a79ba9f",
+    "created_at": "2026-06-18T07:00:20.977Z",
+    "updated_at": "2026-06-18T07:01:38.964Z"
+  },
+  {
+    "customer_id": "b6b2acfd-c100-43d6-a95a-04e2d0a685c0",
+    "vehicle_id": "c83c3e9b-1aee-499d-b520-9baedc2f4560",
+    "technicianId": "usr_2",
+    "bayId": "bay_2",
+    "assigned_technician_id": "usr_2",
+    "status": "In Progress",
+    "line_items": [
+      {
+        "serviceId": "srv_1781686280175_vtnzdvp",
+        "name": "Pollution Test",
+        "quantity": 1,
+        "unitPrice": 0,
+        "total": 0,
+        "gst_rate": 18
+      }
+    ],
+    "subtotal": 0,
+    "total_tax": 0,
+    "total_amount": 0,
+    "warranty_end_date": null,
+    "warranty_notes": null,
+    "created_by": "U-001",
+    "id": "565655eb-8d55-452c-8de3-2ca2c052a551",
+    "created_at": "2026-06-18T07:03:56.799Z",
+    "updated_at": "2026-06-18T07:26:22.649Z"
+  },
+  {
+    "customer_id": "5aa6e58d-ca22-4d7f-807d-97a46f39753a",
+    "vehicle_id": "6220608a-919c-41e6-8d4f-bbd43bb2de5f",
+    "technicianId": "usr_2",
+    "bayId": "bay_2",
+    "status": "Completed",
+    "line_items": [
+      {
+        "serviceId": "srv_1781686263469_8nbod9c",
+        "name": "Nitrogen Air Fitting",
+        "quantity": 1,
+        "unitPrice": 600,
+        "total": 600,
+        "gst_rate": 18
+      },
+      {
+        "serviceId": "srv_1781686115627_lptsz6c",
+        "name": "Tyre Rotation",
+        "quantity": 1,
+        "unitPrice": 600,
+        "total": 600,
+        "gst_rate": 18
+      }
+    ],
+    "subtotal": 1200,
+    "total_tax": 216,
+    "total_amount": 1416,
+    "warranty_end_date": null,
+    "warranty_notes": null,
+    "created_by": "U-001",
+    "id": "21c18771-ef24-496c-b014-b5285699eb1d",
+    "created_at": "2026-06-18T07:24:47.541Z",
+    "updated_at": "2026-06-18T07:39:56.272Z",
+    "assigned_technician_id": "usr_2"
   }
 ]

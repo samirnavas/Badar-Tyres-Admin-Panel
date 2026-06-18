@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Michelin Primacy 4",
+    "sku": "TYRE-2505-56",
+    "category": "Tyre",
+    "brand": "Michelin",
+    "costPrice": 800,
+    "retailPrice": 750,
+    "stockLevel": 60,
+    "minStockThreshold": 5,
+    "location": "Asile 3, showroom",
+    "id": "4973277a-acce-4f2b-b44b-1b69666f06eb",
+    "createdAt": "2026-06-17T19:12:33.670Z",
+    "updatedAt": "2026-06-17T19:12:33.670Z"
+  }
+]

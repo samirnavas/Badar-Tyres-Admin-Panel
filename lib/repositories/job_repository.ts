@@ -1,11 +1,14 @@
 "use server";
 
-import type { JobCard } from "../models/JobCard";
+import type { JobCard, JobCardLineItem, JobCardStatus } from "../models/JobCard";
+import { getJobLineItems, getJobBayId, normalizeJobStatus } from "../models/JobCard";
 import type { Customer } from "../models/Customer";
 import type { Vehicle } from "../models/Vehicle";
 import { readData, writeData } from "../db";
 import { generateId } from "../generateId";
 import { simulateLatency } from "./delay";
+import { getPartById, updatePart } from "./part_repository";
+import { getBayById, setBayStatus } from "./bay_repository";
 
 const FILE_NAME = "jobs.json";
 const CUSTOMERS_FILE = "customers.json";
@@ -27,14 +30,89 @@ export interface JobCardWithRelations extends JobCard {
 export type CreateJobCardInput = Omit<
   JobCard,
   "id" | "created_at" | "updated_at"
->;
+> & {
+  status?: JobCardStatus;
+};
+
+async function deductInventoryForLineItems(
+  lineItems: JobCardLineItem[],
+): Promise<void> {
+  return; // Disconnected inventory feature for now
+  /*
+  for (const item of lineItems) {
+    if (!item.partId) continue;
+
+    const part = await getPartById(item.partId);
+    if (!part) continue;
+
+    await updatePart(item.partId, {
+      stockLevel: Math.max(0, part.stockLevel - item.quantity),
+    });
+  }
+  */
+}
+
+function shouldDeductInventory(
+  previousStatus: JobCardStatus,
+  nextStatus: JobCardStatus,
+): boolean {
+  return (
+    previousStatus === "Estimate" &&
+    (nextStatus === "Approved" || nextStatus === "In Progress")
+  );
+}
+
+function normalizeJobRecord(job: JobCard): JobCard {
+  return {
+    ...job,
+    technicianId: job.technicianId ?? job.assigned_technician_id ?? null,
+    bayId: job.bayId ?? null,
+    created_by: job.created_by,
+    created_at: job.created_at,
+    updated_at: job.updated_at,
+    line_items: job.line_items ?? [],
+    queue_index: job.queue_index,
+  };
+}
+
+async function releaseBay(bayId: string | null | undefined, excludeJobId?: string): Promise<void> {
+  if (!bayId) return;
+  const bay = await getBayById(bayId);
+  if (bay && bay.status === "Occupied") {
+    const jobs = await readData<JobCard[]>(FILE_NAME);
+    const queuedJobs = jobs.filter(
+      (job) =>
+        job.bayId === bayId &&
+        job.id !== excludeJobId &&
+        (normalizeJobStatus(job.status) === "In Progress" ||
+          normalizeJobStatus(job.status) === "Approved")
+    );
+    if (queuedJobs.length === 0) {
+      await setBayStatus(bayId, "Open");
+    }
+  }
+}
+
+async function occupyBay(bayId: string): Promise<void> {
+  const bay = await getBayById(bayId);
+  if (!bay) {
+    throw new Error("Selected bay was not found.");
+  }
+  if (bay.status === "Maintenance") {
+    throw new Error(`Bay "${bay.name}" is currently under maintenance.`);
+  }
+  if (bay.status !== "Occupied") {
+    await setBayStatus(bayId, "Occupied");
+  }
+}
 
 /**
  * Returns all job cards.
  */
 export async function getJobCards(): Promise<JobCard[]> {
   await simulateLatency();
-  return readData<JobCard[]>(FILE_NAME);
+  const jobs = await readData<JobCard[]>(FILE_NAME);
+  return jobs.map(normalizeJobRecord);
 }
 
 /**
@@ -47,6 +125,7 @@ export async function getJobCardsByCustomerId(
   await simulateLatency();
   const jobs = await readData<JobCard[]>(FILE_NAME);
   return jobs
+    .map(normalizeJobRecord)
     .filter((job) => job.customer_id === customerId)
     .sort(
       (a, b) =>
@@ -64,8 +143,10 @@ export async function getJobCardById(
   await simulateLatency();
 
   const jobs = await readData<JobCard[]>(FILE_NAME);
-  const jobCard = jobs.find((job) => job.id === id);
-  if (!jobCard) return null;
+  const rawJob = jobs.find((job) => job.id === id);
+  if (!rawJob) return null;
+
+  const jobCard = normalizeJobRecord(rawJob);
 
   const customers = await readData<Customer[]>(CUSTOMERS_FILE);
   const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
@@ -86,10 +167,11 @@ export async function getRecentJobsWithRelations(): Promise<JobCardWithRelations
   const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
   
   return jobs
-    .map(job => {
-      const customer = customers.find(c => c.id === job.customer_id) ?? null;
-      const vehicle = vehicles.find(v => v.id === job.vehicle_id) ?? null;
-      return { ...job, customer, vehicle };
+    .map((job) => {
+      const normalized = normalizeJobRecord(job);
+      const customer = customers.find(c => c.id === normalized.customer_id) ?? null;
+      const vehicle = vehicles.find(v => v.id === normalized.vehicle_id) ?? null;
+      return { ...normalized, customer, vehicle };
     })
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
@@ -119,6 +201,10 @@ export async function createJobCard(
   const now = new Date().toISOString();
   const jobCard: JobCard = {
     ...data,
+    status: data.status ?? "Estimate",
+    technicianId: data.technicianId ?? data.assigned_technician_id ?? null,
+    bayId: data.bayId ?? null,
+    line_items: data.line_items ?? [],
     id: generateId(),
     created_at: now,
     updated_at: now,
@@ -128,6 +214,17 @@ export async function createJobCard(
   jobs.push(jobCard);
   await writeData(FILE_NAME, jobs);
 
+  if (
+    jobCard.status === "Approved" ||
+    jobCard.status === "In Progress"
+  ) {
+    await deductInventoryForLineItems(getJobLineItems(jobCard));
+  }
+
+  if (jobCard.status === "In Progress" && jobCard.bayId) {
+    await occupyBay(jobCard.bayId);
+  }
+
   return jobCard;
 }
 
@@ -136,7 +233,7 @@ export async function createJobCard(
  */
 export async function updateJobStatus(
   jobId: string,
-  newStatus: string,
+  newStatus: JobCardStatus,
 ): Promise<JobCardWithRelations | null> {
   await simulateLatency();
 
@@ -144,15 +241,35 @@ export async function updateJobStatus(
   const jobIndex = jobs.findIndex((job) => job.id === jobId);
   if (jobIndex === -1) return null;
 
-  const jobCard = jobs[jobIndex];
-  jobCard.status = newStatus as any;
+  const jobCard = normalizeJobRecord(jobs[jobIndex]);
+  const previousStatus = normalizeJobStatus(jobCard.status);
+
+  if (shouldDeductInventory(previousStatus, newStatus)) {
+    await deductInventoryForLineItems(getJobLineItems(jobCard));
+  }
+
+  if (newStatus === "In Progress") {
+    const bayId = getJobBayId(jobCard);
+    if (!bayId) {
+      throw new Error(
+        "A bay must be assigned before starting work on this job.",
+      );
+    }
+    await occupyBay(bayId);
+  }
+
+  if (newStatus === "Completed") {
+    await releaseBay(getJobBayId(jobCard), jobId);
+  }
+
+  jobCard.status = newStatus;
   jobCard.updated_at = new Date().toISOString();
+  jobs[jobIndex] = jobCard;
 
   const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
   const vehicleIndex = vehicles.findIndex((v) => v.id === jobCard.vehicle_id);
-  
-  // Smart Service Interval Calculation
-  if (newStatus === "Completed" || newStatus === "Invoiced") {
+
+  if (newStatus === "Completed") {
     if (vehicleIndex !== -1) {
       const vehicle = vehicles[vehicleIndex];
       const nextServiceDate = new Date();
@@ -169,6 +286,132 @@ export async function updateJobStatus(
   const vehicle = vehicleIndex !== -1 ? vehicles[vehicleIndex] : null;
 
   return { ...jobCard, customer, vehicle };
+}
+
+export interface UpdateJobAssignmentsInput {
+  technicianId?: string | null;
+  bayId?: string | null;
+}
+
+/**
+ * Updates technician and/or bay assignment for a job card.
+ * If the job is already in progress, bay changes release the old bay and
+ * occupy the newly selected open bay.
+ */
+export async function updateJobAssignments(
+  jobId: string,
+  data: UpdateJobAssignmentsInput,
+): Promise<JobCardWithRelations | null> {
+  await simulateLatency();
+
+  const jobs = await readData<JobCard[]>(FILE_NAME);
+  const jobIndex = jobs.findIndex((job) => job.id === jobId);
+  if (jobIndex === -1) return null;
+
+  const jobCard = normalizeJobRecord(jobs[jobIndex]);
+  const previousBayId = getJobBayId(jobCard);
+  const isInProgress = normalizeJobStatus(jobCard.status) === "In Progress";
+
+  if (data.technicianId !== undefined) {
+    jobCard.technicianId = data.technicianId;
+    if (data.technicianId) {
+      jobCard.assigned_technician_id = data.technicianId;
+    }
+  }
+
+  if (data.bayId !== undefined) {
+    if (data.bayId && isInProgress) {
+      if (previousBayId && previousBayId !== data.bayId) {
+        await releaseBay(previousBayId, jobId);
+      }
+      await occupyBay(data.bayId);
+    }
+    jobCard.bayId = data.bayId;
+  }
+
+  jobCard.updated_at = new Date().toISOString();
+  jobs[jobIndex] = jobCard;
+  await writeData(FILE_NAME, jobs);
+
+  const customers = await readData<Customer[]>(CUSTOMERS_FILE);
+  const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
+  const customer = customers.find((c) => c.id === jobCard.customer_id) ?? null;
+  const vehicle =
+    vehicles.find((v) => v.id === jobCard.vehicle_id) ?? null;
+
+  return { ...jobCard, customer, vehicle };
+}
+
+export interface AddJobLineItemInput {
+  serviceId?: string;
+  partId?: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  gst_rate?: number;
+}
+
+function recalculateJobTotals(lineItems: JobCardLineItem[]) {
+  let subtotal = 0;
+  let total_tax = 0;
+
+  for (const item of lineItems) {
+    const amount = item.quantity * item.unitPrice;
+    const gstRate = item.gst_rate ?? 18;
+    subtotal += amount;
+    total_tax += (amount * gstRate) / 100;
+  }
+
+  return {
+    subtotal,
+    total_tax,
+    total_amount: subtotal + total_tax,
+  };
+}
+
+/**
+ * Appends a service or part line item to an existing job card and
+ * recalculates financial totals.
+ */
+export async function appendLineItemToJob(
+  jobId: string,
+  input: AddJobLineItemInput,
+): Promise<JobCardWithRelations | null> {
+  await simulateLatency();
+
+  const jobs = await readData<JobCard[]>(FILE_NAME);
+  const jobIndex = jobs.findIndex((job) => job.id === jobId);
+  if (jobIndex === -1) return null;
+
+  const jobCard = normalizeJobRecord(jobs[jobIndex]);
+  const quantity = input.quantity || 1;
+  const unitPrice = input.unitPrice;
+  const newLineItem: JobCardLineItem = {
+    serviceId: input.serviceId,
+    partId: input.partId,
+    name: input.name,
+    quantity,
+    unitPrice,
+    total: quantity * unitPrice,
+    gst_rate: input.gst_rate ?? 18,
+  };
+
+  jobCard.line_items = [...getJobLineItems(jobCard), newLineItem];
+  const totals = recalculateJobTotals(jobCard.line_items);
+  jobCard.subtotal = totals.subtotal;
+  jobCard.total_tax = totals.total_tax;
+  jobCard.total_amount = totals.total_amount;
+  jobCard.updated_at = new Date().toISOString();
+
+  jobs[jobIndex] = jobCard;
+  await writeData(FILE_NAME, jobs);
+
+  const customers = await readData<Customer[]>(CUSTOMERS_FILE);
+  const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
+  const customer = customers.find((c) => c.id === jobCard.customer_id) ?? null;
+  const vehicle =
+    vehicles.find((v) => v.id === jobCard.vehicle_id) ?? null;
+
   return { ...jobCard, customer, vehicle };
 }
 
@@ -218,13 +461,17 @@ export async function getDashboardMetrics(timeframe: Timeframe = "today") {
       continue;
     }
 
-    if (job.status === "Draft" || job.status === "In Progress") {
+    const status = normalizeJobStatus(job.status);
+
+    if (
+      status === "Estimate" ||
+      status === "Approved" ||
+      status === "In Progress"
+    ) {
       pendingJobs++;
-    } else if (job.status === "Completed" || job.status === "Invoiced") {
+    } else if (status === "Completed" || status === "Closed") {
       completedJobs++;
-      if (job.status === "Invoiced") {
-        revenue += job.total_amount;
-      }
+      revenue += job.total_amount;
     }
   }
 
@@ -244,15 +491,16 @@ export async function getServiceAnalytics(timeframe: Timeframe = "today"): Promi
   await simulateLatency();
 
   const jobs = await readData<JobCard[]>(FILE_NAME);
-  // Also load services in case we need to fallback for older jobs
-  const servicesData = await readData<any[]>("services.json");
-  const serviceMap = new Map(servicesData.map((s) => [s.id, s]));
 
   const validJobs = jobs.filter(
-    (job) =>
-      (job.status === "Completed" || job.status === "Invoiced") &&
-      (isWithinTimeframe(job.created_at, timeframe) ||
-        isWithinTimeframe(job.updated_at, timeframe))
+    (job) => {
+      const status = normalizeJobStatus(job.status);
+      return (
+        (status === "Completed" || status === "Closed") &&
+        (isWithinTimeframe(job.created_at, timeframe) ||
+          isWithinTimeframe(job.updated_at, timeframe))
+      );
+    },
   );
 
   let totalRevenue = 0;
@@ -262,26 +510,18 @@ export async function getServiceAnalytics(timeframe: Timeframe = "today"): Promi
   for (const job of validJobs) {
     totalRevenue += job.total_amount;
 
-    if (job.service_items && job.service_items.length > 0) {
-      // New format with full details
-      for (const item of job.service_items) {
-        const qty = item.qty || 1;
-        const rate = item.rate || 0;
+    const lineItems = getJobLineItems(job);
+
+    if (lineItems.length > 0) {
+      for (const item of lineItems) {
+        const qty = item.quantity || 1;
+        const rate = item.unitPrice || 0;
 
         volumeMap.set(item.name, (volumeMap.get(item.name) || 0) + qty);
-        revenueMap.set(item.name, (revenueMap.get(item.name) || 0) + rate * qty);
-      }
-    } else if (job.service_item_ids && job.service_item_ids.length > 0) {
-      // Old format fallback: assume qty=1 and lookup rate
-      for (const serviceId of job.service_item_ids) {
-        const service = serviceMap.get(serviceId);
-        if (service) {
-          volumeMap.set(service.name, (volumeMap.get(service.name) || 0) + 1);
-          revenueMap.set(
-            service.name,
-            (revenueMap.get(service.name) || 0) + (service.price || 0)
-          );
-        }
+        revenueMap.set(
+          item.name,
+          (revenueMap.get(item.name) || 0) + (item.total || rate * qty),
+        );
       }
     }
   }
@@ -316,10 +556,14 @@ export async function getRevenueTrend(timeframe: Timeframe = "week"): Promise<Re
   const jobs = await readData<JobCard[]>(FILE_NAME);
 
   const validJobs = jobs.filter(
-    (job) =>
-      (job.status === "Invoiced" || job.status === "Completed") &&
-      (isWithinTimeframe(job.created_at, timeframe) ||
-        isWithinTimeframe(job.updated_at, timeframe))
+    (job) => {
+      const status = normalizeJobStatus(job.status);
+      return (
+        (status === "Completed" || status === "Closed") &&
+        (isWithinTimeframe(job.created_at, timeframe) ||
+          isWithinTimeframe(job.updated_at, timeframe))
+      );
+    },
   );
 
   const buckets: { [key: string]: number } = {};

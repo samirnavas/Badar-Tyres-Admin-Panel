@@ -1,16 +1,21 @@
+"use client";
+
 import { cn } from "@/lib/format";
 import type { JobStatus } from "@/lib/types";
 import type { JobCardStatus } from "@/lib/models/JobCard";
+import { normalizeJobStatus } from "@/lib/models/JobCard";
 
-export type BadgeStatus = JobStatus | JobCardStatus;
+export type BadgeStatus = JobStatus | JobCardStatus | "Draft" | "Invoiced";
 
 const styles: Record<BadgeStatus, string> = {
-  // Relational JobCard statuses
-  Draft: "bg-gray-100 text-gray-600 border-gray-200",
-  "In Progress": "bg-blue-50 text-blue-700 border-blue-200",
+  Estimate: "bg-gray-100 text-gray-600 border-gray-200",
+  Approved: "bg-blue-50 text-blue-700 border-blue-200",
+  "In Progress": "bg-amber-50 text-amber-700 border-amber-200",
   Completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  Invoiced: "bg-violet-50 text-violet-700 border-violet-200",
-  // Legacy Job statuses (dashboard / older views)
+  Closed: "bg-slate-100 text-slate-700 border-slate-200",
+  Cancelled: "bg-red-50 text-red-700 border-red-200",
+  Draft: "bg-gray-100 text-gray-600 border-gray-200",
+  Invoiced: "bg-emerald-50 text-emerald-700 border-emerald-200",
   completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
   running: "bg-amber-50 text-amber-700 border-amber-200",
   delayed: "bg-theme-accent-soft text-theme-accent border-theme-accent/30",
@@ -18,10 +23,14 @@ const styles: Record<BadgeStatus, string> = {
 };
 
 const labels: Record<BadgeStatus, string> = {
-  Draft: "Draft",
+  Estimate: "Estimate",
+  Approved: "Approved",
   "In Progress": "In Progress",
   Completed: "Completed",
-  Invoiced: "Invoiced",
+  Closed: "Closed",
+  Cancelled: "Cancelled",
+  Draft: "Estimate",
+  Invoiced: "Completed",
   completed: "Completed",
   running: "Running",
   delayed: "Delayed",
@@ -32,18 +41,24 @@ export function StatusBadge({
   status,
   className,
 }: {
-  status: BadgeStatus;
+  status: BadgeStatus | string;
   className?: string;
 }) {
+  const normalized = normalizeJobStatus(status) as BadgeStatus;
+  const displayStatus =
+    status === "Draft" || status === "Invoiced"
+      ? (status as BadgeStatus)
+      : normalized;
+
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
-        styles[status],
+        styles[displayStatus] ?? styles.Estimate,
         className,
       )}
     >
-      {labels[status]}
+      {labels[displayStatus] ?? labels[normalized] ?? status}
     </span>
   );
 }

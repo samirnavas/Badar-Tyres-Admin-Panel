@@ -6,6 +6,7 @@ import { ArrowLeft, CarFront, FileText, Calendar, Edit, Building2, User, Phone, 
 import { formatCurrency, formatDate, cn } from "@/lib/format";
 import type { Vehicle360 } from "@/lib/repositories";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { getJobPrimaryLineLabel } from "@/lib/models/JobCard";
 import { useState } from "react";
 import { VehicleFormModal } from "@/components/vehicles/VehicleFormModal";
 
@@ -166,7 +167,7 @@ export default function VehicleProfileClient({ data }: { data: Vehicle360 }) {
                   className="transition-colors hover:bg-gray-50 cursor-pointer"
                 >
                   <td className="px-6 py-4 font-medium text-gray-900">
-                    {job.service_items?.[0]?.name ?? "Service"}
+                    {getJobPrimaryLineLabel(job)}
                   </td>
                   <td className="px-6 py-4 font-medium text-gray-900">
                     {formatDate(job.created_at)}

@@ -4,6 +4,8 @@ import { useState, useEffect, FormEvent } from "react";
 import { Search, RefreshCw, Menu, LogOut, ChevronDown, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/format";
 
 export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { user, logout } = useAuth();
@@ -11,8 +13,10 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [isSearching, setIsSearching] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     setSearchQuery(searchParams.get("search") || "");
@@ -37,6 +41,13 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
     } else {
       router.push(`/search`);
     }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries();
+    router.refresh();
+    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   return (
@@ -69,10 +80,12 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
       <div className="ml-auto flex items-center gap-1 sm:gap-2">
         <button
-          className="flex items-center gap-1.5 rounded-md px-2.5 py-2 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
-          title="Sync status: synced"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="flex items-center gap-1.5 rounded-md px-2.5 py-2 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50"
+          title="Refresh data"
         >
-          <RefreshCw className="h-4 w-4" />
+          <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
         </button>
 

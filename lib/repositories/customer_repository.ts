@@ -3,6 +3,7 @@
 import type { Customer } from "../models/Customer";
 import type { Vehicle } from "../models/Vehicle";
 import type { JobCard } from "../models/JobCard";
+import { normalizeJobStatus } from "../models/JobCard";
 import { readData, writeData } from "../db";
 import { generateId } from "../generateId";
 import { simulateLatency } from "./delay";
@@ -61,7 +62,7 @@ export async function getCustomersListWithLTV(): Promise<CustomerListWithLTV[]> 
   // Group jobs by customer to compute LTV efficiently
   const ltvMap = new Map<string, number>();
   for (const job of jobs) {
-    if (job.status === "Completed" || job.status === "Invoiced") {
+    if (normalizeJobStatus(job.status) === "Completed" || normalizeJobStatus(job.status) === "Closed") {
       const current = ltvMap.get(job.customer_id) ?? 0;
       ltvMap.set(job.customer_id, current + job.total_amount);
     }
@@ -94,7 +95,7 @@ export async function getCustomer360(customerId: string): Promise<Customer360 | 
   const customerJobs = jobs.filter((j) => j.customer_id === customerId);
 
   const ltv = customerJobs.reduce((sum, job) => {
-    if (job.status === "Completed" || job.status === "Invoiced") {
+    if (normalizeJobStatus(job.status) === "Completed" || normalizeJobStatus(job.status) === "Closed") {
       return sum + job.total_amount;
     }
     return sum;

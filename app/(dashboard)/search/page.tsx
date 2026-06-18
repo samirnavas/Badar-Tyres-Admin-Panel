@@ -13,6 +13,7 @@ import {
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { getJobLineItems, getJobPrimaryLineLabel } from "@/lib/models/JobCard";
 import { normalizeSearchQuery, matchesAnySearchQuery } from "@/lib/search";
 
 export default function SearchPage() {
@@ -93,8 +94,9 @@ function SearchResults() {
     const matchedJobs = jobList.filter((job) => {
       const customer = customerMap.get(job.customer_id);
       const vehicle = vehicleMap.get(job.vehicle_id);
-      const serviceNames =
-        job.service_items?.map((item) => item.name).join(" ") ?? "";
+      const lineItemText = getJobLineItems(job)
+        .map((item) => item.name)
+        .join(" ");
 
       return matchesAnySearchQuery(
         [
@@ -105,7 +107,7 @@ function SearchResults() {
           vehicle?.manufacturer,
           vehicle?.model,
           job.status,
-          serviceNames,
+          lineItemText,
           job.id,
         ],
         deferredQuery,
@@ -244,7 +246,7 @@ function SearchResults() {
                 (v) => v.id === job.vehicle_id,
               );
               const primaryService =
-                job.service_items?.[0]?.name ?? "Service";
+                getJobPrimaryLineLabel(job);
 
               return (
                 <Link

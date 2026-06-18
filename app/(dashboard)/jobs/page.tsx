@@ -6,21 +6,39 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, ShieldCheck } from "lucide-react";
 import { getJobCards, getCustomers, getVehicles, getTechnicians } from "@/lib/repositories";
-import type { JobCard, JobCardStatus } from "@/lib/models/JobCard";
+import type { JobCard } from "@/lib/models/JobCard";
+import { normalizeJobStatus, getJobTechnicianId } from "@/lib/models/JobCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Combobox, type ComboboxOption } from "@/components/ui/Combobox";
 import { cn, formatCurrency, formatDate, isWarrantyActive } from "@/lib/format";
 
-type TabValue = JobCardStatus | "all";
+type PipelineFilter = "all" | "estimates" | "active" | "completed";
 
-const tabs: { value: TabValue; label: string }[] = [
+const tabs: { value: PipelineFilter; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "Draft", label: "Draft" },
-  { value: "In Progress", label: "In Progress" },
-  { value: "Completed", label: "Completed" },
-  { value: "Invoiced", label: "Invoiced" },
+  { value: "estimates", label: "Estimates" },
+  { value: "active", label: "Active Jobs" },
+  { value: "completed", label: "Completed" },
 ];
+
+function matchesPipelineFilter(
+  status: JobCard["status"] | string,
+  filter: PipelineFilter,
+): boolean {
+  const normalized = normalizeJobStatus(status);
+
+  switch (filter) {
+    case "estimates":
+      return normalized === "Estimate";
+    case "active":
+      return normalized === "Approved" || normalized === "In Progress";
+    case "completed":
+      return normalized === "Completed" || normalized === "Cancelled";
+    default:
+      return true;
+  }
+}
 
 interface JobRow extends JobCard {
   customerName: string;
@@ -32,7 +50,7 @@ interface JobRow extends JobCard {
 
 export default function JobsPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<TabValue>("all");
+  const [tab, setTab] = useState<PipelineFilter>("all");
   const [selectedTechnician, setSelectedTechnician] = useState<string>("all");
 
   const jobsQuery = useQuery({ queryKey: ["job-cards"], queryFn: getJobCards });
@@ -76,11 +94,11 @@ export default function JobsPage() {
     );
 
     return (jobsQuery.data ?? [])
-      .filter((job) => tab === "all" || job.status === tab)
+      .filter((job) => matchesPipelineFilter(job.status, tab))
       .filter(
         (job) =>
           selectedTechnician === "all" ||
-          job.assigned_technician_id === selectedTechnician,
+          getJobTechnicianId(job) === selectedTechnician,
       )
       .map((job) => {
         const vehicle = vehicleMap.get(job.vehicle_id);
@@ -92,7 +110,7 @@ export default function JobsPage() {
             : "—",
           vehicleRegistration: vehicle ? vehicle.registration_number : "—",
           technicianName:
-            technicianMap.get(job.assigned_technician_id)?.name ?? "Unassigned",
+            technicianMap.get(getJobTechnicianId(job) ?? "")?.name ?? "Unassigned",
           warrantyActive: isWarrantyActive(job.warranty_end_date),
         };
       });
@@ -115,14 +133,14 @@ export default function JobsPage() {
             Job Cards
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Track service operations across all bays.
+            Manage estimates and active workshop jobs across all bays.
           </p>
         </div>
         <Link
           href="/jobs/create"
           className="inline-flex items-center gap-2 rounded-lg bg-theme-accent px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-theme-accent-dark"
         >
-          <Plus className="h-4 w-4" /> New Job Card
+          <Plus className="h-4 w-4" /> New Estimate
         </Link>
       </div>
 

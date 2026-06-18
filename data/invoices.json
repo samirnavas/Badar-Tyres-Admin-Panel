@@ -1,0 +1,54 @@
+[
+  {
+    "jobId": "21c18771-ef24-496c-b014-b5285699eb1d",
+    "customerId": "5aa6e58d-ca22-4d7f-807d-97a46f39753a",
+    "subtotal": 1200,
+    "tax": 216,
+    "total": 1416,
+    "amountPaid": 0,
+    "status": "Unpaid",
+    "paymentMethod": null,
+    "id": "69a2a385-df08-45a6-bc7d-e2677f7db8b7",
+    "createdAt": "2026-06-18T07:39:30.995Z",
+    "updatedAt": "2026-06-18T07:39:30.995Z"
+  },
+  {
+    "jobId": "b3723bff-b8b2-4d82-b51b-dacd4f33f091",
+    "customerId": "5d1b95b3-770a-43f8-a765-c3dcda115990",
+    "subtotal": 3400,
+    "tax": 612,
+    "total": 4012,
+    "amountPaid": 4012,
+    "status": "Paid",
+    "paymentMethod": "Cash",
+    "id": "87f76e6a-9f5f-4d7c-b7a9-11b8e6fff7e8",
+    "createdAt": "2026-06-17T19:09:39.852Z",
+    "updatedAt": "2026-06-17T19:10:09.355Z"
+  },
+  {
+    "id": "inv_d6cf1adb",
+    "jobId": "d6cf1adb-3b0b-4d3c-b07e-c79b8d6a0f5a",
+    "customerId": "b6b2acfd-c100-43d6-a95a-04e2d0a685c0",
+    "subtotal": 250,
+    "tax": 45,
+    "total": 295,
+    "amountPaid": 295,
+    "status": "Paid",
+    "paymentMethod": "Card",
+    "createdAt": "2026-06-16T07:25:00.000Z",
+    "updatedAt": "2026-06-16T07:25:00.000Z"
+  },
+  {
+    "id": "inv_f5ab696a",
+    "jobId": "f5ab696a-ecdc-42d5-b7e4-020c157c0991",
+    "customerId": "b6b2acfd-c100-43d6-a95a-04e2d0a685c0",
+    "subtotal": 1200,
+    "tax": 216,
+    "total": 1416,
+    "amountPaid": 500,
+    "status": "Partial",
+    "paymentMethod": "Cash",
+    "createdAt": "2026-06-16T08:30:00.000Z",
+    "updatedAt": "2026-06-16T09:00:00.000Z"
+  }
+]

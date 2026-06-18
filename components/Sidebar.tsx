@@ -10,6 +10,8 @@ import {
   Settings,
   X,
   Wrench,
+  Package,
+  Warehouse,
   Receipt,
   Bell,
 } from "lucide-react";
@@ -18,10 +20,12 @@ import { cn } from "@/lib/format";
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
   { label: "Services", href: "/services", icon: Wrench },
+  // { label: "Inventory", href: "/inventory", icon: Package },
   { label: "Job Cards", href: "/jobs", icon: FileText },
   { label: "Billing", href: "/billing", icon: Receipt },
   { label: "CRM", href: "/users", icon: Users },
   { label: "Vehicle Fleet Logs", href: "/vehicles", icon: Truck },
+  { label: "Service Bay", href: "/bays", icon: Warehouse },
   { label: "Notifications", href: "/notifications", icon: Bell },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

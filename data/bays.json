@@ -1,0 +1,12 @@
+[
+  {
+    "id": "bay_1",
+    "name": "Alignment Bay 1",
+    "status": "Open"
+  },
+  {
+    "id": "bay_2",
+    "name": "General Service Bay 1",
+    "status": "Occupied"
+  }
+]

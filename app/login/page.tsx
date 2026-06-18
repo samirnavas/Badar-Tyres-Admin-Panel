@@ -112,7 +112,7 @@ export default function LoginPage() {
 
       <div className="w-full lg:w-[45%] flex items-center justify-center bg-white px-8 py-12">
         <div className="w-full max-w-[420px]">
-          <div className="mb-12">
+          <div className="mb-12 flex justify-center lg:justify-start">
             <Image
               src="/badar_logo_black.svg"
               alt="Badar Tyres Logo"
@@ -124,8 +124,8 @@ export default function LoginPage() {
           </div>
 
           <div className="mb-8">
-            <h1 className="text-[1.35rem] font-bold text-gray-900 mb-2">Welcome Back</h1>
-            <p className="text-gray-500 text-[15px]">
+            <h1 className="text-[1.35rem] font-bold text-gray-900 mb-2 flex justify-center lg:justify-start">Welcome Back</h1>
+            <p className="text-gray-500 text-[15px] flex justify-center lg:justify-start">
               Sign in to your workshop admin account.
             </p>
           </div>

@@ -1,12 +1,22 @@
 "use client";
 
-import { use, useMemo } from "react";
+import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, Loader2 } from "lucide-react";
-import { getJobCardById, getServices, getSettings } from "@/lib/repositories";
-import type { Service } from "@/lib/models/Service";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  Printer,
+  Loader2,
+  CreditCard,
+  Mail,
+  CheckCircle2,
+} from "lucide-react";
+import { getJobCardById, getSettings } from "@/lib/repositories";
+import { getOrCreateInvoiceForJob } from "@/lib/repositories/invoice_repository";
+import { getJobLineItems } from "@/lib/models/JobCard";
+import { ProcessPaymentModal } from "@/components/billing/ProcessPaymentModal";
+import { cn, formatCurrency, formatDate } from "@/lib/format";
+import type { InvoiceStatus } from "@/lib/models/Invoice";
 
 interface InvoiceLine {
   id: string;
@@ -18,55 +28,100 @@ interface InvoiceLine {
   lineTotal: number;
 }
 
+const invoiceStatusStyles: Record<InvoiceStatus, string> = {
+  Unpaid: "bg-gray-100 text-gray-700",
+  Partial: "bg-gray-200 text-gray-800",
+  Paid: "bg-gray-900 text-white",
+};
+
 export default function InvoicePage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = use(params);
+  const { id: jobId } = use(params);
   const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [emailSending, setEmailSending] = useState(false);
 
   const jobQuery = useQuery({
-    queryKey: ["job-card", id],
-    queryFn: () => getJobCardById(id),
+    queryKey: ["job-card", jobId],
+    queryFn: () => getJobCardById(jobId),
   });
-  const servicesQuery = useQuery({
-    queryKey: ["service-catalog"],
-    queryFn: getServices,
+
+  const invoiceQuery = useQuery({
+    queryKey: ["invoice", jobId],
+    queryFn: () => getOrCreateInvoiceForJob(jobId),
+    enabled: !!jobQuery.data,
   });
+
   const settingsQuery = useQuery({
     queryKey: ["shop-settings"],
     queryFn: getSettings,
   });
 
   const job = jobQuery.data;
+  const invoice = invoiceQuery.data;
 
   const lines: InvoiceLine[] = useMemo(() => {
-    if (!job || !servicesQuery.data) return [];
-    const serviceMap = new Map<string, Service>(
-      servicesQuery.data.map((s) => [s.id, s]),
-    );
-    // The mock JobCard stores one entry per service_item_id at qty 1.
-    return job.service_item_ids.map((sid, index) => {
-      const service = serviceMap.get(sid);
-      const rate = service?.price ?? 0;
-      const gstRate = service?.gst_rate ?? 0;
-      const qty = 1;
-      const taxAmount = (rate * qty * gstRate) / 100;
+    if (!job) return [];
+
+    return getJobLineItems(job).map((item, index) => {
+      const gstRate = item.gst_rate ?? 0;
+      const taxAmount = (item.total * gstRate) / 100;
       return {
-        id: `${sid}-${index}`,
-        name: service?.name ?? "Unknown service",
-        qty,
-        rate,
+        id: `${item.serviceId ?? item.partId ?? index}-${index}`,
+        name: item.name,
+        qty: item.quantity,
+        rate: item.unitPrice,
         gstRate,
         taxAmount,
-        lineTotal: rate * qty,
+        lineTotal: item.total,
       };
     });
-  }, [job, servicesQuery.data]);
+  }, [job]);
+
+  const outstanding = invoice
+    ? Math.max(0, invoice.total - invoice.amountPaid)
+    : 0;
+
+  const handlePaymentSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["invoice", jobId] });
+    queryClient.invalidateQueries({ queryKey: ["job-card", jobId] });
+    queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    queryClient.invalidateQueries({ queryKey: ["billing-metrics"] });
+    queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+    router.refresh();
+  };
+
+  const sendEmailReceipt = async () => {
+    if (!invoice) return;
+    setEmailSending(true);
+    try {
+      const response = await fetch(`/api/invoices/${invoice.id}/send`, {
+        method: "POST",
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to send receipt email.");
+      }
+      setToast(data.message ?? "Receipt email queued successfully.");
+      window.setTimeout(() => setToast(null), 4000);
+    } catch (error) {
+      setToast(
+        (error as Error)?.message ?? "Failed to send receipt email.",
+      );
+      window.setTimeout(() => setToast(null), 4000);
+    } finally {
+      setEmailSending(false);
+    }
+  };
 
   const isLoading =
-    jobQuery.isLoading || servicesQuery.isLoading || settingsQuery.isLoading;
+    jobQuery.isLoading || invoiceQuery.isLoading || settingsQuery.isLoading;
 
   if (isLoading) {
     return (
@@ -76,7 +131,7 @@ export default function InvoicePage({
     );
   }
 
-  if (jobQuery.isError || !job) {
+  if (jobQuery.isError || !job || !invoice) {
     return (
       <div className="mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center">
         <p className="text-sm font-medium text-theme-accent">
@@ -93,32 +148,59 @@ export default function InvoicePage({
   }
 
   const settings = settingsQuery.data;
-  const shortId = job.id.slice(0, 8).toUpperCase();
+  const shortId = invoice.id.slice(0, 8).toUpperCase();
 
   return (
     <div
-      className="mx-auto max-w-3xl"
+      className="relative mx-auto max-w-3xl"
       style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
     >
-      {/* Action bar — never printed */}
-      <div className="mb-4 flex items-center justify-between print:hidden">
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex max-w-sm items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-lg print:hidden">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>{toast}</p>
+        </div>
+      )}
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <button
           onClick={() => router.back()}
           className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
         >
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
-        <button
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-2 rounded-lg bg-theme-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-theme-accent-dark"
-        >
-          <Printer className="h-4 w-4" /> Print Invoice
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {invoice.status !== "Paid" && (
+            <button
+              onClick={() => setPaymentOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-900 bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
+            >
+              <CreditCard className="h-4 w-4" /> Process Payment
+            </button>
+          )}
+          <button
+            onClick={sendEmailReceipt}
+            disabled={emailSending}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-50 disabled:opacity-60"
+          >
+            {emailSending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Mail className="h-4 w-4" />
+            )}
+            Send Email Receipt
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 rounded-lg bg-theme-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-theme-accent-dark"
+          >
+            <Printer className="h-4 w-4" /> Print Invoice
+          </button>
+        </div>
       </div>
 
-      {/* Invoice document */}
-      <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm print:w-full print:max-w-none print:rounded-none print:border-none print:p-0 print:shadow-none sm:p-10">
-        {/* Header */}
+      <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm print:w-full print:max-w-none print:rounded-none print:border-none print:p-0 print:shadow-none sm:p-10 [color-scheme:light]">
         <div className="flex flex-wrap items-start justify-between gap-6 border-b border-gray-200 pb-6">
           <div className="max-w-xs">
             <img
@@ -143,24 +225,38 @@ export default function InvoicePage({
             </h1>
             <dl className="mt-3 space-y-1 text-xs">
               <div className="flex justify-end gap-2">
-                <dt className="text-gray-400">Job Card</dt>
+                <dt className="text-gray-400">Invoice</dt>
                 <dd className="font-semibold text-gray-900">#{shortId}</dd>
+              </div>
+              <div className="flex justify-end gap-2">
+                <dt className="text-gray-400">Job Card</dt>
+                <dd className="font-medium text-gray-700">
+                  #{job.id.slice(0, 8).toUpperCase()}
+                </dd>
               </div>
               <div className="flex justify-end gap-2">
                 <dt className="text-gray-400">Date</dt>
                 <dd className="font-medium text-gray-700">
-                  {formatDate(job.created_at)}
+                  {formatDate(invoice.createdAt)}
                 </dd>
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex items-center justify-end gap-2">
                 <dt className="text-gray-400">Status</dt>
-                <dd className="font-medium text-gray-700">{job.status}</dd>
+                <dd>
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                      invoiceStatusStyles[invoice.status],
+                    )}
+                  >
+                    {invoice.status}
+                  </span>
+                </dd>
               </div>
             </dl>
           </div>
         </div>
 
-        {/* Customer & vehicle block */}
         <div className="grid grid-cols-1 gap-6 border-b border-gray-200 py-6 sm:grid-cols-2">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
@@ -191,7 +287,6 @@ export default function InvoicePage({
           </div>
         </div>
 
-        {/* Line items */}
         <table className="mt-6 w-full border-collapse text-sm">
           <thead>
             <tr className="border-b-2 border-gray-300 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
@@ -235,27 +330,41 @@ export default function InvoicePage({
           </tbody>
         </table>
 
-        {/* Summary */}
         <div className="mt-6 flex justify-end">
           <dl className="w-full max-w-xs space-y-2 text-sm">
             <div className="flex justify-between text-gray-600">
               <dt>Subtotal</dt>
-              <dd className="tabular-nums">₹ {formatCurrency(job.subtotal)}</dd>
+              <dd className="tabular-nums">₹ {formatCurrency(invoice.subtotal)}</dd>
             </div>
             <div className="flex justify-between text-gray-600">
               <dt>Total Tax</dt>
-              <dd className="tabular-nums">₹ {formatCurrency(job.total_tax)}</dd>
+              <dd className="tabular-nums">₹ {formatCurrency(invoice.tax)}</dd>
             </div>
             <div className="flex justify-between border-t border-gray-300 pt-2 text-base font-bold text-gray-900">
               <dt>Grand Total</dt>
+              <dd className="tabular-nums">₹ {formatCurrency(invoice.total)}</dd>
+            </div>
+            <div className="flex justify-between text-gray-600">
+              <dt>Amount Paid</dt>
               <dd className="tabular-nums">
-                ₹ {formatCurrency(job.total_amount)}
+                ₹ {formatCurrency(invoice.amountPaid)}
               </dd>
             </div>
+            {outstanding > 0 && (
+              <div className="flex justify-between font-semibold text-gray-900">
+                <dt>Outstanding</dt>
+                <dd className="tabular-nums">₹ {formatCurrency(outstanding)}</dd>
+              </div>
+            )}
+            {invoice.paymentMethod && (
+              <div className="flex justify-between text-xs text-gray-500">
+                <dt>Payment Method</dt>
+                <dd>{invoice.paymentMethod}</dd>
+              </div>
+            )}
           </dl>
         </div>
 
-        {/* Footer: terms + signature */}
         <div className="mt-10 grid grid-cols-1 gap-8 border-t border-gray-200 pt-6 sm:grid-cols-[1fr_auto]">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
@@ -276,6 +385,13 @@ export default function InvoicePage({
           Thank you for choosing {settings?.shop_name}.
         </p>
       </div>
+
+      <ProcessPaymentModal
+        open={paymentOpen}
+        onClose={() => setPaymentOpen(false)}
+        invoice={invoice}
+        onSuccess={handlePaymentSuccess}
+      />
     </div>
   );
 }

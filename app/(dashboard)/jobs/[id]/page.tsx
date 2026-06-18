@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,11 +11,30 @@ import {
   CheckCircle2,
   FileText,
   ExternalLink,
+  ClipboardCheck,
+  Warehouse,
+  Loader2,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { getJobCardById, getServices, updateJobStatus } from "@/lib/repositories";
-import { cn, formatCurrency, formatDate } from "@/lib/format";
+import { Combobox, type ComboboxOption } from "@/components/ui/Combobox";
+import {
+  getJobCardById,
+  updateJobStatus,
+  updateJobAssignments,
+  getBays,
+  getJobCards,
+} from "@/lib/repositories";
+import { getTechnicians } from "@/lib/repositories/technician_repository";
+import {
+  getJobLineItems,
+  getJobTechnicianId,
+  getJobBayId,
+  normalizeJobStatus,
+} from "@/lib/models/JobCard";
+import type { JobCardStatus } from "@/lib/models/JobCard";
+import { formatCurrency, formatDate } from "@/lib/format";
+import { InspectionReportPanel } from "@/components/inspections/InspectionReportPanel";
 
 export default function JobPreviewPage({
   params,
@@ -31,20 +50,93 @@ export default function JobPreviewPage({
     queryFn: () => getJobCardById(id),
   });
 
-  const { data: servicesList } = useQuery({
-    queryKey: ["service-catalog"],
-    queryFn: getServices,
+  const techniciansQuery = useQuery({
+    queryKey: ["technicians"],
+    queryFn: getTechnicians,
   });
 
+  const baysQuery = useQuery({
+    queryKey: ["bays"],
+    queryFn: getBays,
+  });
+
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState("");
+  const [selectedBayId, setSelectedBayId] = useState("");
+
+  useEffect(() => {
+    if (!jobCard) return;
+    setSelectedTechnicianId(getJobTechnicianId(jobCard) ?? "");
+    setSelectedBayId(getJobBayId(jobCard) ?? "");
+  }, [jobCard]);
+
   const updateStatusMutation = useMutation({
-    mutationFn: (newStatus: string) => updateJobStatus(id, newStatus),
+    mutationFn: (newStatus: JobCardStatus) => updateJobStatus(id, newStatus),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jobCard", id] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["bays"] });
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
       router.refresh();
     },
   });
+
+  const assignmentMutation = useMutation({
+    mutationFn: (input: { technicianId?: string | null; bayId?: string | null }) =>
+      updateJobAssignments(id, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobCard", id] });
+      queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["bays"] });
+      router.refresh();
+    },
+  });
+
+  const technicianOptions: ComboboxOption[] = useMemo(
+    () => [
+      { value: "", label: "Unassigned" },
+      ...(techniciansQuery.data ?? []).map((tech) => ({
+        value: tech.id,
+        label: tech.name,
+      })),
+    ],
+    [techniciansQuery.data],
+  );
+
+  const jobsQuery = useQuery({
+    queryKey: ["job-cards"],
+    queryFn: getJobCards,
+  });
+
+  const bayOptions: ComboboxOption[] = useMemo(() => {
+    const activeBays = (baysQuery.data ?? []).filter((b) => b.status !== "Maintenance");
+    const jobs = jobsQuery.data ?? [];
+
+    return [
+      { value: "", label: "No bay assigned" },
+      ...activeBays.map((bay) => {
+        const queuedJobs = jobs.filter(
+          (j) =>
+            getJobBayId(j) === bay.id &&
+            (normalizeJobStatus(j.status) === "In Progress" ||
+              normalizeJobStatus(j.status) === "Approved")
+        );
+        const queueCount = queuedJobs.length;
+        
+        let hint = bay.status;
+        if (queueCount > 0) {
+          hint = `${queueCount} in queue`;
+        }
+
+        return {
+          value: bay.id,
+          label: bay.name,
+          hint,
+        };
+      }),
+    ];
+  }, [baysQuery.data, jobsQuery.data]);
 
   if (isLoading) {
     return (
@@ -79,9 +171,35 @@ export default function JobPreviewPage({
     );
   }
 
-  // Action Bar Logic
+  const normalizedStatus = normalizeJobStatus(jobCard.status);
+  const hasAssignmentChanges =
+    selectedTechnicianId !== (getJobTechnicianId(jobCard) ?? "") ||
+    selectedBayId !== (getJobBayId(jobCard) ?? "");
+
   let ActionBar = null;
-  if (jobCard.status === "Draft" || jobCard.status === "In Progress") {
+  if (normalizedStatus === "Estimate") {
+    ActionBar = (
+      <button
+        onClick={() => updateStatusMutation.mutate("Approved")}
+        disabled={updateStatusMutation.isPending}
+        className="inline-flex items-center gap-2 rounded-lg bg-theme-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-theme-accent-dark disabled:opacity-60"
+      >
+        <CheckCircle2 className="h-4 w-4" />
+        {updateStatusMutation.isPending ? "Approving..." : "Approve Job"}
+      </button>
+    );
+  } else if (normalizedStatus === "Approved") {
+    ActionBar = (
+      <button
+        onClick={() => updateStatusMutation.mutate("In Progress")}
+        disabled={updateStatusMutation.isPending}
+        className="inline-flex items-center gap-2 rounded-lg bg-theme-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-theme-accent-dark disabled:opacity-60"
+      >
+        <CheckCircle2 className="h-4 w-4" />
+        {updateStatusMutation.isPending ? "Starting..." : "Start Work"}
+      </button>
+    );
+  } else if (normalizedStatus === "In Progress") {
     ActionBar = (
       <button
         onClick={() => updateStatusMutation.mutate("Completed")}
@@ -92,7 +210,7 @@ export default function JobPreviewPage({
         {updateStatusMutation.isPending ? "Marking..." : "Mark as Completed"}
       </button>
     );
-  } else if (jobCard.status === "Completed") {
+  } else if (normalizedStatus === "Completed" || normalizedStatus === "Closed") {
     ActionBar = (
       <Link
         href={`/jobs/${jobCard.id}/invoice`}
@@ -126,6 +244,12 @@ export default function JobPreviewPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {updateStatusMutation.isError && (
+            <p className="text-sm font-medium text-theme-accent">
+              {(updateStatusMutation.error as Error)?.message ??
+                "Failed to update job status."}
+            </p>
+          )}
           {ActionBar}
         </div>
       </div>
@@ -150,22 +274,33 @@ export default function JobPreviewPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {jobCard.service_item_ids.length > 0 ? (
-                    jobCard.service_item_ids.map((serviceId, index) => {
-                      const s = (servicesList || []).find((x) => x.id === serviceId);
-                      const name = s ? s.name : "Unknown Service";
-                      const rate = s ? s.price : 0;
-                      const qty = 1; // JobCard does not store quantity currently
-                      const gstRate = s ? s.gst_rate : 18;
-                      const tax = (rate * qty * gstRate) / 100;
-                      const total = (rate * qty) + tax;
+                  {getJobLineItems(jobCard).length > 0 ? (
+                    getJobLineItems(jobCard).map((item, index) => {
+                      const gstRate = item.gst_rate ?? 18;
+                      const tax = (item.total * gstRate) / 100;
+                      const total = item.total + tax;
                       return (
                         <tr key={index} className="transition-colors hover:bg-gray-50">
-                          <td className="px-5 py-4 font-medium text-gray-900">{name}</td>
-                          <td className="px-5 py-4 text-center text-gray-600">{qty}</td>
-                          <td className="px-5 py-4 text-right text-gray-600">₹{formatCurrency(rate)}</td>
-                          <td className="px-5 py-4 text-right text-gray-600">₹{formatCurrency(tax)}</td>
-                          <td className="px-5 py-4 text-right font-medium text-gray-900">₹{formatCurrency(total)}</td>
+                          <td className="px-5 py-4 font-medium text-gray-900">
+                            {item.name}
+                            {item.partId && (
+                              <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-gray-500">
+                                Part
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-center text-gray-600">
+                            {item.quantity}
+                          </td>
+                          <td className="px-5 py-4 text-right text-gray-600">
+                            ₹{formatCurrency(item.unitPrice)}
+                          </td>
+                          <td className="px-5 py-4 text-right text-gray-600">
+                            ₹{formatCurrency(tax)}
+                          </td>
+                          <td className="px-5 py-4 text-right font-medium text-gray-900">
+                            ₹{formatCurrency(total)}
+                          </td>
                         </tr>
                       );
                     })
@@ -200,10 +335,102 @@ export default function JobPreviewPage({
               </div>
             </div>
           </div>
+
+          <InspectionReportPanel jobId={jobCard.id} />
         </div>
 
         {/* Right Column (1/3 width) */}
         <div className="space-y-6">
+          {/* Assignment Panel */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme-accent/10 text-theme-accent">
+                <ClipboardCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Assignment Panel</h3>
+                <p className="text-xs text-gray-500">
+                  Assign a technician and bay before starting work.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  Technician
+                </label>
+                <Combobox
+                  options={technicianOptions}
+                  value={selectedTechnicianId}
+                  onChange={setSelectedTechnicianId}
+                  placeholder={
+                    techniciansQuery.isLoading
+                      ? "Loading technicians..."
+                      : "Select technician..."
+                  }
+                  disabled={techniciansQuery.isLoading}
+                  emptyMessage="No technicians found"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  Service Bay
+                </label>
+                <Combobox
+                  options={bayOptions}
+                  value={selectedBayId}
+                  onChange={setSelectedBayId}
+                  placeholder={
+                    baysQuery.isLoading
+                      ? "Loading bays..."
+                      : "Select open bay..."
+                  }
+                  disabled={baysQuery.isLoading}
+                  emptyMessage="No open bays available"
+                />
+              </div>
+
+              {normalizedStatus === "Approved" && !selectedBayId && (
+                <p className="text-xs font-medium text-amber-700">
+                  Assign a bay before clicking Start Work.
+                </p>
+              )}
+
+              {assignmentMutation.isError && (
+                <p className="text-xs font-medium text-theme-accent">
+                  {(assignmentMutation.error as Error)?.message ??
+                    "Failed to save assignments."}
+                </p>
+              )}
+
+              <button
+                type="button"
+                disabled={assignmentMutation.isPending || !hasAssignmentChanges}
+                onClick={() =>
+                  assignmentMutation.mutate({
+                    technicianId: selectedTechnicianId || null,
+                    bayId: selectedBayId || null,
+                  })
+                }
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-theme-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-theme-accent-dark disabled:opacity-60"
+              >
+                {assignmentMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Warehouse className="h-4 w-4" />
+                    Save Assignments
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
           {/* Customer Details */}
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">

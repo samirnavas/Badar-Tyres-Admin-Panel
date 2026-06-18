@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
@@ -10,6 +10,7 @@ import { X, Loader2, Wrench } from "lucide-react";
 import { createService, updateService } from "@/lib/repositories/service_repository";
 import { cn } from "@/lib/format";
 import type { Service } from "@/lib/models/Service";
+import { Combobox } from "@/components/ui/Combobox";
 
 const serviceSchema = z.object({
   name: z.string().min(1, "Service name is required"),
@@ -37,6 +38,7 @@ export function ServiceFormModal({
   const {
     register,
     handleSubmit,
+    control,
     reset,
     formState: { errors },
   } = useForm<ServiceFormValues>({
@@ -142,16 +144,25 @@ export function ServiceFormModal({
           </Field>
 
           <Field label="Category" error={errors.category?.message}>
-            <select
-              {...register("category")}
-              className={inputClass(!!errors.category)}
-            >
-              <option value="Tyres">Tyres</option>
-              <option value="Alignment">Alignment</option>
-              <option value="Oil">Oil</option>
-              <option value="Labor">Labor</option>
-              <option value="Parts">Parts</option>
-            </select>
+            <Controller
+              control={control}
+              name="category"
+              render={({ field }) => (
+                <Combobox
+                  options={[
+                    { value: "Tyres", label: "Tyres" },
+                    { value: "Alignment", label: "Alignment" },
+                    { value: "Oil", label: "Oil" },
+                    { value: "Labor", label: "Labor" },
+                    { value: "Parts", label: "Parts" },
+                  ]}
+                  value={field.value}
+                  onChange={field.onChange}
+                  className={inputClass(!!errors.category)}
+                  placeholder="Select category..."
+                />
+              )}
+            />
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
