@@ -56,6 +56,7 @@ export type {
   AddJobLineItemInput,
 } from "./job_repository";
 export { getSettings, updateSettings } from "./settings_repository";
+export { getPermissions, updatePermissions } from "./permission_repository";
 export {
   getManufacturers,
   createManufacturer,

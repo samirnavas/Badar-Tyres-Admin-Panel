@@ -19,5 +19,12 @@
     "username": "rahul",
     "password": "rahul123",
     "role": "technician"
+  },
+  {
+    "id": "U-004",
+    "name": "David",
+    "username": "david",
+    "password": "david123",
+    "role": "Sales"
   }
 ]

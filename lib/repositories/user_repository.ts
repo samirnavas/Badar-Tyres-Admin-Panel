@@ -30,7 +30,7 @@ export async function getUserById(id: string): Promise<User | null> {
 export async function getTechnicians(): Promise<User[]> {
   await simulateLatency();
   const users = await readData<User[]>(FILE_NAME);
-  return users.filter((user) => user.role === "technician");
+  return users.filter((user) => user.role === "Technician");
 }
 
 export async function createUser(data: Omit<User, "id">): Promise<User> {
@@ -42,18 +42,45 @@ export async function createUser(data: Omit<User, "id">): Promise<User> {
   return newUser;
 }
 
-export async function updateUserRole(id: string, newRole: User["role"]): Promise<User | null> {
+export async function updateUser(
+  id: string,
+  data: Partial<Omit<User, "id">>,
+  actingUserId: string,
+): Promise<User | null> {
   await simulateLatency();
   const users = await readData<User[]>(FILE_NAME);
   const userIndex = users.findIndex((u) => u.id === id);
   if (userIndex === -1) return null;
-  users[userIndex].role = newRole;
+
+  const targetUser = users[userIndex];
+
+  if (
+    data.role &&
+    targetUser.id === actingUserId &&
+    targetUser.role === "Admin" &&
+    data.role !== "Admin"
+  ) {
+    throw new Error("Admins cannot demote their own role.");
+  }
+
+  users[userIndex] = { ...targetUser, ...data };
   await writeData(FILE_NAME, users);
   return users[userIndex];
 }
 
-export async function deleteUser(id: string): Promise<void> {
+export async function updateUserRole(
+  id: string,
+  newRole: User["role"],
+  actingUserId: string,
+): Promise<User | null> {
+  return updateUser(id, { role: newRole }, actingUserId);
+}
+
+export async function deleteUser(id: string, actingUserId: string): Promise<void> {
   await simulateLatency();
+  if (id === actingUserId) {
+    throw new Error("Admins cannot delete their own account.");
+  }
   const users = await readData<User[]>(FILE_NAME);
   const filtered = users.filter((u) => u.id !== id);
   await writeData(FILE_NAME, filtered);

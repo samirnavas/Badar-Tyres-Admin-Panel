@@ -1,0 +1,39 @@
+{
+  "Admin": [
+    "*"
+  ],
+  "Manager": [
+    "/dashboard",
+    "/jobs",
+    "/services",
+    "/inventory",
+    "/customers",
+    "/bays",
+    "/billing"
+  ],
+  "Supervisor": [
+    "/dashboard",
+    "/jobs",
+    "/services",
+    "/inventory",
+    "/customers",
+    "/bays"
+  ],
+  "Team Lead": [
+    "/dashboard",
+    "/jobs",
+    "/inventory",
+    "/bays"
+  ],
+  "Technician": [
+    "/dashboard",
+    "/jobs",
+    "/bays"
+  ],
+  "Sales": [
+    "/billing",
+    "/dashboard",
+    "/jobs",
+    "/services"
+  ]
+}

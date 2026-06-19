@@ -1,18 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { X, UserPlus } from "lucide-react";
 import { createUser } from "@/lib/repositories/user_repository";
 import { cn } from "@/lib/format";
-import { Combobox } from "@/components/ui/Combobox";
+import type { UserRole } from "@/lib/models/User";
+
+const USER_ROLES = [
+  "Admin",
+  "Manager",
+  "Supervisor",
+  "Team Lead",
+  "Technician",
+  "Sales",
+] as const satisfies readonly UserRole[];
 
 const userSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  role: z.enum(["admin", "technician", "agent"]),
+  role: z.enum(USER_ROLES),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional().or(z.literal("")),
 });
@@ -27,13 +36,12 @@ export function AddUserModal({ open, onClose }: { open: boolean; onClose: () => 
     register,
     handleSubmit,
     reset,
-    control,
     formState: { errors },
   } = useForm<UserForm>({
     resolver: zodResolver(userSchema),
     defaultValues: {
       name: "",
-      role: "technician",
+      role: "Technician",
       email: "",
       phone: "",
     },
@@ -46,7 +54,7 @@ export function AddUserModal({ open, onClose }: { open: boolean; onClose: () => 
     try {
       await createUser({
         name: values.name,
-        role: values.role as any,
+        role: values.role,
         email: values.email || "",
         phone: values.phone || "",
       });
@@ -105,27 +113,21 @@ export function AddUserModal({ open, onClose }: { open: boolean; onClose: () => 
               <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                 Role *
               </label>
-              <Controller
-                control={control}
-                name="role"
-                render={({ field }) => (
-                  <Combobox
-                    options={[
-                      { value: "technician", label: "Technician" },
-                      { value: "admin", label: "Admin" },
-                      { value: "agent", label: "Agent" },
-                    ]}
-                    value={field.value}
-                    onChange={field.onChange}
-                    className={cn(
-                      errors.role
-                        ? "border-theme-accent focus:border-theme-accent focus:ring-theme-accent"
-                        : "border-gray-200 focus:border-theme-accent focus:ring-theme-accent"
-                    )}
-                    placeholder="Select role..."
-                  />
+              <select
+                {...register("role")}
+                className={cn(
+                  "w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-1",
+                  errors.role
+                    ? "border-theme-accent focus:border-theme-accent focus:ring-theme-accent"
+                    : "border-gray-200 focus:border-theme-accent focus:ring-theme-accent"
                 )}
-              />
+              >
+                {USER_ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
               {errors.role && <p className="mt-1 text-xs text-theme-accent">{errors.role.message}</p>}
             </div>
 

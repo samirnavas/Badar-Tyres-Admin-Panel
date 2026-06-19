@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useAuth } from "@/lib/AuthContext";
 import { useRouter } from "next/navigation";
 import {
   Store,
@@ -17,6 +18,7 @@ import {
   Trash2,
   Plus,
   X,
+  KeyRound,
 } from "lucide-react";
 import { updateSettings } from "@/lib/repositories/settings_repository";
 import { createManufacturer, deleteManufacturer } from "@/lib/repositories/manufacturer_repository";
@@ -27,29 +29,46 @@ import type { Manufacturer } from "@/lib/models/Manufacturer";
 import { cn } from "@/lib/format";
 import { settingsSchema, type SettingsForm } from "./schema";
 import { AddUserModal } from "./AddUserModal";
+import { PermissionsMatrix } from "@/components/settings/PermissionsMatrix";
 
-const sections = [
+const allSections = [
   { id: "general", label: "General Information", icon: Store },
   { id: "billing", label: "Billing & Taxes", icon: Receipt },
   { id: "manufacturers", label: "Manage Vehicle Manufacturers", icon: CarFront },
-  { id: "team", label: "Team Management", icon: UsersRound },
+  { id: "team", label: "Team Management", icon: UsersRound, adminOnly: true },
+  { id: "permissions", label: "Role Permissions", icon: KeyRound, adminOnly: true },
 ] as const;
 
 const roleStyles: Record<UserRole, { label: string; className: string; icon: typeof Shield }> = {
-  admin: {
+  Admin: {
     label: "Admin",
     className: "border-theme-accent/30 bg-theme-accent-soft text-theme-accent",
     icon: Shield,
   },
-  agent: {
-    label: "Agent",
-    className: "border-blue-200 bg-blue-50 text-blue-700",
+  Manager: {
+    label: "Manager",
+    className: "border-purple-200 bg-purple-50 text-purple-700",
     icon: UserCog,
   },
-  technician: {
+  Supervisor: {
+    label: "Supervisor",
+    className: "border-indigo-200 bg-indigo-50 text-indigo-700",
+    icon: UserCog,
+  },
+  "Team Lead": {
+    label: "Team Lead",
+    className: "border-amber-200 bg-amber-50 text-amber-700",
+    icon: UserCog,
+  },
+  Technician: {
     label: "Technician",
     className: "border-gray-200 bg-gray-100 text-gray-600",
     icon: Wrench,
+  },
+  Sales: {
+    label: "Sales",
+    className: "border-blue-200 bg-blue-50 text-blue-700",
+    icon: UserCog,
   },
 };
 
@@ -63,6 +82,11 @@ export default function SettingsClient({
   initialManufacturers: Manufacturer[];
 }) {
   const router = useRouter();
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === "Admin";
+  const sections = allSections.filter(
+    (s) => !("adminOnly" in s && s.adminOnly) || isAdmin,
+  );
   const [activeSection, setActiveSection] = useState<string>("general");
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -127,13 +151,14 @@ export default function SettingsClient({
   };
 
   const handleDeleteUser = async (id: string) => {
+    if (!currentUser) return;
     if (!confirm("Are you sure you want to delete this user?")) return;
     try {
-      await deleteUser(id);
+      await deleteUser(id, currentUser.id);
       router.refresh();
     } catch (e) {
       console.error(e);
-      alert("Failed to delete user");
+      alert(e instanceof Error ? e.message : "Failed to delete user");
     }
   };
 
@@ -323,72 +348,85 @@ export default function SettingsClient({
               </div>
             </Section>
 
-            {/* Team */}
-            <Section
-              id="team"
-              icon={<UsersRound className="h-4 w-4" />}
-              title="Team Management"
-              description="Manage your team members and their roles."
-              action={
-                <button
-                  type="button"
-                  onClick={() => setIsAddUserOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
-                >
-                  <Plus className="h-4 w-4" /> Add Team Member
-                </button>
-              }
-            >
-              <ul className="divide-y divide-gray-100">
-                {initialUsers.map((user) => {
-                  const role = roleStyles[user.role] || roleStyles.technician;
-                  const RoleIcon = role.icon;
-                  return (
-                    <li
-                      key={user.id}
-                      className="flex items-center justify-between gap-3 py-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
-                          {user.name
-                            .split(" ")
-                            .map((p) => p[0])
-                            .slice(0, 2)
-                            .join("")
-                            .toUpperCase()}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-gray-900">
-                            {user.name}
-                          </p>
-                          <p className="truncate text-xs text-gray-500">
-                            {user.email || user.phone || "No contact info"}
-                          </p>
+            {/* Team — Admin only */}
+            {isAdmin && (
+              <Section
+                id="team"
+                icon={<UsersRound className="h-4 w-4" />}
+                title="Team Management"
+                description="Manage your team members and their roles."
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setIsAddUserOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+                  >
+                    <Plus className="h-4 w-4" /> Add Team Member
+                  </button>
+                }
+              >
+                <ul className="divide-y divide-gray-100">
+                  {initialUsers.map((user) => {
+                    const role = roleStyles[user.role] || roleStyles.Technician;
+                    const RoleIcon = role.icon;
+                    return (
+                      <li
+                        key={user.id}
+                        className="flex items-center justify-between gap-3 py-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
+                            {user.name
+                              .split(" ")
+                              .map((p) => p[0])
+                              .slice(0, 2)
+                              .join("")
+                              .toUpperCase()}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-gray-900">
+                              {user.name}
+                            </p>
+                            <p className="truncate text-xs text-gray-500">
+                              {user.email || user.phone || "No contact info"}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span
-                          className={cn(
-                            "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
-                            role.className,
-                          )}
-                        >
-                          <RoleIcon className="h-3 w-3" />
-                          {role.label}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Section>
+                        <div className="flex items-center gap-4">
+                          <span
+                            className={cn(
+                              "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+                              role.className,
+                            )}
+                          >
+                            <RoleIcon className="h-3 w-3" />
+                            {role.label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Section>
+            )}
+
+            {isAdmin && (
+              <Section
+                id="permissions"
+                icon={<KeyRound className="h-4 w-4" />}
+                title="Role Permissions"
+                description="Control which modules each role can access across the application."
+              >
+                <PermissionsMatrix />
+              </Section>
+            )}
           </div>
         </div>
 
@@ -418,10 +456,12 @@ export default function SettingsClient({
         </div>
       </form>
 
-      <AddUserModal
-        open={isAddUserOpen}
-        onClose={() => setIsAddUserOpen(false)}
-      />
+      {isAdmin && (
+        <AddUserModal
+          open={isAddUserOpen}
+          onClose={() => setIsAddUserOpen(false)}
+        />
+      )}
     </>
   );
 }

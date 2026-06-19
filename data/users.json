@@ -2,34 +2,34 @@
   {
     "id": "usr_1",
     "name": "Admin User",
-    "role": "admin",
+    "role": "Admin",
     "email": "admin@badartyres.com",
     "phone": "9999999999"
   },
   {
     "id": "usr_2",
     "name": "Ravi",
-    "role": "technician",
+    "role": "Technician",
     "email": "ravi@badartyres.com",
     "phone": "8888888888"
   },
   {
     "name": "George",
-    "role": "technician",
+    "role": "Technician",
     "email": "george@badartyres.com",
     "phone": "+91 9496952004",
     "id": "usr_1781679447284"
   },
   {
     "name": "Badar",
-    "role": "admin",
+    "role": "Admin",
     "email": "badar@badartyres.com",
     "phone": "+91 9846508631",
     "id": "usr_1781679513113"
   },
   {
     "name": "David",
-    "role": "agent",
+    "role": "Sales",
     "email": "david@gmail.com",
     "phone": "+91 9446583084",
     "id": "usr_1781679568344"

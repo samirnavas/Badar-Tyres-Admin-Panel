@@ -16,6 +16,7 @@ import {
   Bell,
 } from "lucide-react";
 import { cn } from "@/lib/format";
+import { useAuth } from "@/lib/AuthContext";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
@@ -40,6 +41,9 @@ export function Sidebar({
   unreadNotificationsCount?: number;
 }) {
   const pathname = usePathname();
+  const { hasPermission } = useAuth();
+
+  const visibleNavItems = navItems.filter((item) => hasPermission(item.href));
 
   return (
     <>
@@ -72,7 +76,7 @@ export function Sidebar({
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-5">
-          {navItems.map(({ label, href, icon: Icon }) => {
+          {visibleNavItems.map(({ label, href, icon: Icon }) => {
             const isActive =
               pathname === href ||
               (href !== "/dashboard" && pathname.startsWith(href));

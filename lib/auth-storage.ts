@@ -1,4 +1,4 @@
-import type { User } from "./types";
+import type { User, UserRole } from "./models/User";
 
 const AUTH_TOKEN_KEY = "badar_auth_token";
 const AUTH_USER_KEY = "badar_auth_user";
@@ -9,6 +9,35 @@ const SAVED_PASSWORD_KEY = "badar_saved_password";
 /** Legacy keys from earlier auth implementation. */
 const LEGACY_TOKEN_KEY = "token";
 const LEGACY_USER_KEY = "user";
+
+const LEGACY_ROLE_MAP: Record<string, UserRole> = {
+  admin: "Admin",
+  agent: "Sales",
+  technician: "Technician",
+};
+
+export function normalizeAuthUser(
+  raw: {
+    id?: string;
+    name?: string;
+    username?: string;
+    role?: string;
+    email?: string;
+    phone?: string;
+  },
+): User {
+  const role =
+    (raw.role && (LEGACY_ROLE_MAP[raw.role] ?? (raw.role as UserRole))) ||
+    "Technician";
+
+  return {
+    id: raw.id ?? "",
+    name: raw.name ?? raw.username ?? "",
+    role,
+    email: raw.email ?? "",
+    phone: raw.phone ?? "",
+  };
+}
 
 function encodePassword(password: string): string {
   if (typeof window === "undefined") return "";
@@ -26,7 +55,7 @@ function readSessionFrom(storage: Storage): { token: string; user: User } | null
   if (!token || !rawUser) return null;
 
   try {
-    return { token, user: JSON.parse(rawUser) as User };
+    return { token, user: normalizeAuthUser(JSON.parse(rawUser)) };
   } catch {
     storage.removeItem(AUTH_TOKEN_KEY);
     storage.removeItem(AUTH_USER_KEY);
@@ -40,7 +69,7 @@ function migrateLegacySession(): { token: string; user: User } | null {
   if (!token || !rawUser) return null;
 
   try {
-    const user = JSON.parse(rawUser) as User;
+    const user = normalizeAuthUser(JSON.parse(rawUser));
     localStorage.removeItem(LEGACY_TOKEN_KEY);
     localStorage.removeItem(LEGACY_USER_KEY);
     persistSession(token, user, true);

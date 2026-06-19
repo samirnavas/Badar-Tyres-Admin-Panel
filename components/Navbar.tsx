@@ -99,7 +99,7 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
             <div className="hidden text-right leading-tight sm:block">
               <p className="text-sm font-semibold text-gray-900">{name}</p>
               <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
-                {user?.role === "admin" ? "Workshop Manager" : "Technician"}
+                {user?.role || "Staff"}
               </p>
             </div>
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-theme-accent text-sm font-semibold text-white">

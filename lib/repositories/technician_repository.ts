@@ -17,6 +17,6 @@ export async function getTechnicians(): Promise<User[]> {
 export async function getTechnicianById(id: string): Promise<User | null> {
   await simulateLatency();
   const user = await getUserById(id);
-  if (!user || user.role !== "technician") return null;
+  if (!user || user.role !== "Technician") return null;
   return user;
 }

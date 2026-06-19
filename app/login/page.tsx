@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import {
   getSavedCredentials,
+  normalizeAuthUser,
   saveLoginCredentials,
 } from "@/lib/auth-storage";
 import { Loader2, User as UserIcon, Lock, Eye, EyeOff } from "lucide-react";
@@ -31,7 +32,7 @@ export default function LoginPage() {
   const [credentialsReady, setCredentialsReady] = useState(false);
 
   useEffect(() => {
-    if (isInitialized && user?.role === "admin") {
+    if (isInitialized && user) {
       router.replace("/dashboard");
     }
   }, [isInitialized, user, router]);
@@ -67,17 +68,12 @@ export default function LoginPage() {
     mutationFn: ({ username, password }: LoginForm) =>
       api.login({ username, password }),
     onSuccess: (data, variables) => {
-      if (data.user.role !== "admin") {
-        setErrorMsg("Access denied. Admin privileges required.");
-        return;
-      }
-
       saveLoginCredentials(
         variables.username,
         variables.password,
         variables.rememberMe,
       );
-      login(data.token, data.user, variables.rememberMe);
+      login(data.token, normalizeAuthUser(data.user), variables.rememberMe);
       router.replace("/dashboard");
     },
     onError: (err: Error) => {
