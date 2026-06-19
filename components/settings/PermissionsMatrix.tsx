@@ -10,6 +10,7 @@ import {
 import { EDITABLE_ROLES, PERMISSION_MODULES } from "@/lib/permissions";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/format";
+import { toast } from "sonner";
 
 export const permissionsQueryKey = ["permissions"] as const;
 
@@ -38,7 +39,9 @@ export function PermissionsMatrix() {
       setSavedAt(Date.now());
       await queryClient.invalidateQueries({ queryKey: permissionsQueryKey });
       await refreshPermissions();
+      toast.success("Permissions saved successfully");
     },
+    onError: (error) => toast.error(error.message || "Failed to save permissions"),
   });
 
   const isDirty =

@@ -20,6 +20,7 @@ export function Combobox({
   emptyMessage = "No results found",
   onCreateNew,
   createNewLabel = (query: string) => `Add "${query}" as new`,
+  autoFocus,
 }: {
   options: ComboboxOption[];
   value: string;
@@ -31,9 +32,11 @@ export function Combobox({
   /** When provided and no result matches the query, shows a create CTA. */
   onCreateNew?: (query: string) => void;
   createNewLabel?: (query: string) => string;
+  autoFocus?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [coords, setCoords] = useState<{
     top: number;
     left: number;
@@ -87,6 +90,7 @@ export function Combobox({
       if (!isInsideContainer && !isInsideDropdown) {
         setOpen(false);
         setQuery("");
+        setActiveIndex(-1);
       }
     };
     document.addEventListener("mousedown", handleOutsideClick);
@@ -111,15 +115,53 @@ export function Combobox({
             className,
           )}
           placeholder={placeholder || "Select..."}
+          autoFocus={autoFocus}
           value={open ? query : selectedLabel}
+          onKeyDown={(e) => {
+            if (!open) {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                setOpen(true);
+                setActiveIndex(0);
+                e.preventDefault();
+              }
+              return;
+            }
+
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setActiveIndex((prev) => (prev < filtered.length - 1 ? prev + 1 : prev));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setActiveIndex((prev) => (prev > 0 ? prev - 1 : 0));
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              if (activeIndex >= 0 && activeIndex < filtered.length) {
+                onChange(filtered[activeIndex].value);
+                setQuery("");
+                setOpen(false);
+                setActiveIndex(-1);
+              } else if (filtered.length === 0 && onCreateNew && query.trim()) {
+                const term = query.trim();
+                setQuery("");
+                setOpen(false);
+                setActiveIndex(-1);
+                onCreateNew(term);
+              }
+            } else if (e.key === "Escape") {
+              setOpen(false);
+              setActiveIndex(-1);
+            }
+          }}
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
+            setActiveIndex(0);
           }}
           onFocus={() => {
             if (disabled) return;
             setOpen(true);
             setQuery("");
+            setActiveIndex(-1);
           }}
         />
         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -149,6 +191,7 @@ export function Combobox({
                     const term = query.trim();
                     setQuery("");
                     setOpen(false);
+                    setActiveIndex(-1);
                     onCreateNew(term);
                   }}
                 >
@@ -161,18 +204,20 @@ export function Combobox({
                 </li>
               )
             ) : (
-              filtered.map((opt) => (
+              filtered.map((opt, idx) => (
                 <li
                   key={opt.value}
                   className={cn(
                     "mx-1 flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-theme-accent hover:text-white",
                     value === opt.value &&
                       "bg-theme-accent-soft font-medium text-theme-accent",
+                    activeIndex === idx && "bg-theme-accent text-white"
                   )}
                   onClick={() => {
                     onChange(opt.value);
                     setQuery("");
                     setOpen(false);
+                    setActiveIndex(-1);
                   }}
                 >
                   <span className="truncate">{opt.label}</span>

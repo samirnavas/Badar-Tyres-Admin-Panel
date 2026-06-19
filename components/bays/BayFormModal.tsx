@@ -11,6 +11,7 @@ import { updateBay, createBay, deleteBay } from "@/lib/repositories/bay_reposito
 import type { Bay, BayStatus } from "@/lib/models/Bay";
 import { cn } from "@/lib/format";
 import { Combobox } from "@/components/ui/Combobox";
+import { toast } from "sonner";
 
 const baySchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -72,10 +73,12 @@ export function BayFormModal({
         });
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["bays"] });
+      toast.success(bay ? `Bay ${variables.name} updated` : `Bay ${variables.name} added`);
       onClose();
     },
+    onError: (error) => toast.error(error.message || "Failed to save bay"),
   });
 
   const deleteMutation = useMutation({
@@ -85,8 +88,10 @@ export function BayFormModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bays"] });
+      toast.success(`Bay ${bay?.name} deleted`);
       onClose();
     },
+    onError: (error) => toast.error(error.message || "Failed to delete bay"),
   });
 
   useEffect(() => {

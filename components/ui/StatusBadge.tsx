@@ -5,60 +5,54 @@ import type { JobStatus } from "@/lib/types";
 import type { JobCardStatus } from "@/lib/models/JobCard";
 import { normalizeJobStatus } from "@/lib/models/JobCard";
 
-export type BadgeStatus = JobStatus | JobCardStatus | "Draft" | "Invoiced";
+export type BadgeStatus = string;
 
-const styles: Record<BadgeStatus, string> = {
-  Estimate: "bg-gray-100 text-gray-600 border-gray-200",
-  Approved: "bg-blue-50 text-blue-700 border-blue-200",
-  "In Progress": "bg-amber-50 text-amber-700 border-amber-200",
-  Completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  Closed: "bg-slate-100 text-slate-700 border-slate-200",
-  Cancelled: "bg-red-50 text-red-700 border-red-200",
-  Draft: "bg-gray-100 text-gray-600 border-gray-200",
-  Invoiced: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  running: "bg-amber-50 text-amber-700 border-amber-200",
-  delayed: "bg-theme-accent-soft text-theme-accent border-theme-accent/30",
-  pending: "bg-gray-100 text-gray-600 border-gray-200",
+// Semantic mapping of statuses to colors
+const styleCategories = {
+  positive: "bg-green-100 text-green-800 border-green-200",
+  warning: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  neutral: "bg-gray-100 text-gray-700 border-gray-200",
+  critical: "bg-red-100 text-red-800 border-red-200",
 };
 
-const labels: Record<BadgeStatus, string> = {
-  Estimate: "Estimate",
-  Approved: "Approved",
-  "In Progress": "In Progress",
-  Completed: "Completed",
-  Closed: "Closed",
-  Cancelled: "Cancelled",
-  Draft: "Estimate",
-  Invoiced: "Completed",
-  completed: "Completed",
-  running: "Running",
-  delayed: "Delayed",
-  pending: "Pending",
+// Map each known status to a semantic category
+const getCategory = (status: string) => {
+  const normalized = status.toLowerCase();
+  
+  if (["completed", "paid", "open", "in stock", "invoiced", "approved"].includes(normalized)) {
+    return styleCategories.positive;
+  }
+  if (["in progress", "partial", "occupied", "low stock", "running"].includes(normalized)) {
+    return styleCategories.warning;
+  }
+  if (["estimate", "unpaid", "draft", "pending", "closed"].includes(normalized)) {
+    return styleCategories.neutral;
+  }
+  if (["cancelled", "maintenance", "out of stock", "delayed"].includes(normalized)) {
+    return styleCategories.critical;
+  }
+  
+  return styleCategories.neutral; // Default
 };
 
 export function StatusBadge({
   status,
   className,
 }: {
-  status: BadgeStatus | string;
+  status: BadgeStatus;
   className?: string;
 }) {
-  const normalized = normalizeJobStatus(status) as BadgeStatus;
-  const displayStatus =
-    status === "Draft" || status === "Invoiced"
-      ? (status as BadgeStatus)
-      : normalized;
-
+  const displayStatus = status === "Draft" ? "Estimate" : status;
+  
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
-        styles[displayStatus] ?? styles.Estimate,
+        getCategory(status),
         className,
       )}
     >
-      {labels[displayStatus] ?? labels[normalized] ?? status}
+      {displayStatus}
     </span>
   );
 }

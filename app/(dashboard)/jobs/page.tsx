@@ -181,25 +181,25 @@ export default function JobsPage() {
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         {/* Desktop table */}
-        <div className="hidden md:block">
+        <div className="hidden md:block w-full overflow-auto max-h-[calc(100vh-200px)]">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                <th className="px-6 py-3.5">Customer</th>
-                <th className="px-6 py-3.5">Vehicle</th>
-                <th className="px-6 py-3.5">Reg. No</th>
-                <th className="px-6 py-3.5">Technician</th>
-                <th className="px-6 py-3.5">Status</th>
-                <th className="px-6 py-3.5">Created</th>
-                <th className="px-6 py-3.5 text-right">Total</th>
+            <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur shadow-[0_1px_0_rgba(0,0,0,0.1)] text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <tr className="border-b border-gray-200 text-left">
+                <th className="px-3 py-2">Customer</th>
+                <th className="px-3 py-2">Vehicle</th>
+                <th className="px-3 py-2">Reg. No</th>
+                <th className="px-3 py-2">Technician</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Created</th>
+                <th className="px-3 py-2 text-right">Total</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 text-sm">
               {isLoading &&
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
                     {Array.from({ length: 7 }).map((__, j) => (
-                      <td key={j} className="px-6 py-4">
+                      <td key={j} className="px-3 py-2">
                         <Skeleton className="h-4 w-full" />
                       </td>
                     ))}
@@ -214,7 +214,7 @@ export default function JobsPage() {
                     onClick={() => goToJob(job.id)}
                     className="cursor-pointer transition-colors hover:bg-gray-50"
                   >
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-2">
                       <div className="flex items-center gap-2 font-medium text-gray-900">
                         {job.customerName}
                         {job.warrantyActive && (
@@ -225,22 +225,22 @@ export default function JobsPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">
+                    <td className="px-3 py-2 text-gray-600">
                       {job.vehicleModel}
                     </td>
-                    <td className="px-6 py-4 text-gray-600">
+                    <td className="px-3 py-2 text-gray-600">
                       {job.vehicleRegistration}
                     </td>
-                    <td className="px-6 py-4 text-gray-600">
+                    <td className="px-3 py-2 text-gray-600">
                       {job.technicianName}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-2">
                       <StatusBadge status={job.status} />
                     </td>
-                    <td className="px-6 py-4 text-gray-500">
+                    <td className="px-3 py-2 text-gray-500">
                       {formatDate(job.created_at)}
                     </td>
-                    <td className="px-6 py-4 text-right font-semibold text-gray-900 tabular-nums">
+                    <td className="px-3 py-2 text-right font-semibold text-gray-900 tabular-nums">
                       ₹ {formatCurrency(job.total_amount)}
                     </td>
                   </tr>

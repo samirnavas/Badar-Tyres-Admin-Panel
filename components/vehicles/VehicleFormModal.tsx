@@ -12,6 +12,7 @@ import type { Vehicle, VehicleType } from "@/lib/models/Vehicle";
 import { cn } from "@/lib/format";
 import { Combobox } from "@/components/ui/Combobox";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 const vehicleSchema = z.object({
   type: z.enum(["Car", "Bike", "Others"]),
@@ -102,11 +103,17 @@ export function VehicleFormModal({
         });
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["vehicles-by-customer", customerId] });
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
       router.refresh();
+      toast.success(vehicleToEdit 
+        ? `Vehicle ${variables.registration_number} updated` 
+        : `Vehicle ${variables.registration_number} added`);
       onClose();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to save vehicle");
     },
   });
 
@@ -152,7 +159,7 @@ export function VehicleFormModal({
         role="dialog"
         aria-modal="true"
         aria-label="Add new vehicle"
-        className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl border border-gray-200 bg-white shadow-2xl sm:rounded-2xl [color-scheme:light]"
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-t-2xl border border-gray-200 bg-white shadow-2xl sm:rounded-2xl [color-scheme:light]"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-5 py-4">
           <div className="flex items-center gap-2">
@@ -174,123 +181,161 @@ export function VehicleFormModal({
         </div>
 
         <form
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && e.target instanceof HTMLElement && e.target.tagName !== "BUTTON") {
+              const isTextarea = e.target.tagName === "TEXTAREA";
+              const isBlankTextarea = isTextarea && (e.target as HTMLTextAreaElement).value.trim() === "";
+
+              if (!isTextarea || isBlankTextarea) {
+                e.preventDefault();
+                const formElements = Array.from(
+                  e.currentTarget.querySelectorAll<HTMLElement>(
+                    "input, select, textarea, button[type='submit']"
+                  )
+                );
+                const index = formElements.indexOf(e.target);
+                if (index > -1 && index < formElements.length - 1) {
+                  formElements[index + 1].focus();
+                }
+              }
+            }
+          }}
           onSubmit={handleSubmit((values) => mutation.mutate(values))}
-          className="space-y-4 p-5"
+          className="flex flex-col"
         >
-          <Field label="Vehicle Type" error={errors.type?.message}>
-            <Controller
-              control={control}
-              name="type"
-              render={({ field }) => (
-                <Combobox
-                  options={[
-                    { value: "Car", label: "Car" },
-                    { value: "Bike", label: "Bike" },
-                    { value: "Others", label: "Others" },
-                  ]}
-                  value={field.value}
-                  onChange={field.onChange}
-                  className={inputClass(!!errors.type)}
-                  placeholder="Select vehicle type..."
+          <div className="space-y-5 p-5">
+            {/* Core Details */}
+            <div className="rounded-xl border border-gray-100 bg-[#f8f9fa] p-4 [color-scheme:light]">
+              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Core Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <Field label="Vehicle Type" error={errors.type?.message}>
+                    <Controller
+                      control={control}
+                      name="type"
+                      render={({ field }) => (
+                        <Combobox
+                          options={[
+                            { value: "Car", label: "Car" },
+                            { value: "Bike", label: "Bike" },
+                            { value: "Others", label: "Others" },
+                          ]}
+                          value={field.value}
+                          onChange={field.onChange}
+                          className={inputClass(!!errors.type)}
+                          placeholder="Select vehicle type..."
+                        />
+                      )}
+                    />
+                  </Field>
+                </div>
+              <Field label="Manufacturer" error={errors.manufacturer?.message}>
+                <Controller
+                  control={control}
+                  name="manufacturer"
+                  render={({ field }) => (
+                    <Combobox
+                      options={manufacturerOptions}
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="Select manufacturer..."
+                      disabled={manufacturersQuery.isLoading}
+                      className={inputClass(!!errors.manufacturer)}
+                      emptyMessage="No manufacturers"
+                      autoFocus
+                    />
+                  )}
                 />
-              )}
-            />
-          </Field>
-
-          <Field label="Manufacturer" error={errors.manufacturer?.message}>
-            <Controller
-              control={control}
-              name="manufacturer"
-              render={({ field }) => (
-                <Combobox
-                  options={manufacturerOptions}
-                  value={field.value ?? ""}
-                  onChange={field.onChange}
-                  placeholder="Select manufacturer..."
-                  disabled={manufacturersQuery.isLoading}
-                  className={inputClass(!!errors.manufacturer)}
-                  emptyMessage="No manufacturers"
+              </Field>
+              <Field label="Model" error={errors.model?.message}>
+                <input
+                  {...register("model")}
+                  placeholder="e.g. Innova"
+                  className={inputClass(!!errors.model)}
                 />
-              )}
-            />
-          </Field>
-
-          <Field label="Model" error={errors.model?.message}>
-            <input
-              {...register("model")}
-              placeholder="e.g. Innova"
-              className={inputClass(!!errors.model)}
-            />
-          </Field>
-
-          <Field label="Registration Number" error={errors.registration_number?.message}>
-            <input
-              {...register("registration_number", {
-                onChange: (e) => {
-                  e.target.value = e.target.value.toUpperCase();
-                },
-              })}
-              placeholder="E.G. KL-07-AB-1234"
-              className={cn(inputClass(!!errors.registration_number), "uppercase")}
-            />
-          </Field>
-
-          <Field label="Chassis Number (Optional)" error={errors.chassis_number?.message}>
-            <input
-              {...register("chassis_number", {
-                onChange: (e) => {
-                  e.target.value = e.target.value.toUpperCase();
-                },
-              })}
-              placeholder="e.g. MA123..."
-              className={cn(inputClass(!!errors.chassis_number), "uppercase")}
-            />
-          </Field>
-
-          <Field label="Engine Number (Optional)" error={errors.engine_number?.message}>
-            <input
-              {...register("engine_number", {
-                onChange: (e) => {
-                  e.target.value = e.target.value.toUpperCase();
-                },
-              })}
-              placeholder="e.g. 1TR..."
-              className={cn(inputClass(!!errors.engine_number), "uppercase")}
-            />
-          </Field>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Insurance Expiry" error={errors.insurance_expiry?.message}>
-              <input
-                type="date"
-                {...register("insurance_expiry")}
-                className={inputClass(!!errors.insurance_expiry)}
-              />
-            </Field>
-            <Field label="Pollution Expiry" error={errors.pollution_expiry?.message}>
-              <input
-                type="date"
-                {...register("pollution_expiry")}
-                className={inputClass(!!errors.pollution_expiry)}
-              />
-            </Field>
+              </Field>
+            </div>
           </div>
 
-          <Field label="Color (Optional)" error={errors.color?.message}>
-            <input
-              {...register("color")}
-              placeholder="e.g. Pearl White"
-              className={inputClass(!!errors.color)}
-            />
-          </Field>
+          {/* Registration & Identifiers */}
+          <div className="rounded-xl border border-gray-100 bg-[#f8f9fa] p-4 [color-scheme:light]">
+            <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Registration & Identifiers</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <Field label="Registration Number" error={errors.registration_number?.message}>
+                  <input
+                    {...register("registration_number", {
+                      onChange: (e) => {
+                        e.target.value = e.target.value.toUpperCase();
+                      },
+                    })}
+                    placeholder="E.G. KL-07-AB-1234"
+                    className={cn(inputClass(!!errors.registration_number), "uppercase")}
+                  />
+                </Field>
+              </div>
+              <Field label="Chassis Number (Optional)" error={errors.chassis_number?.message}>
+                <input
+                  {...register("chassis_number", {
+                    onChange: (e) => {
+                      e.target.value = e.target.value.toUpperCase();
+                    },
+                  })}
+                  placeholder="e.g. MA123..."
+                  className={cn(inputClass(!!errors.chassis_number), "uppercase")}
+                />
+              </Field>
+              <Field label="Engine Number (Optional)" error={errors.engine_number?.message}>
+                <input
+                  {...register("engine_number", {
+                    onChange: (e) => {
+                      e.target.value = e.target.value.toUpperCase();
+                    },
+                  })}
+                  placeholder="e.g. 1TR..."
+                  className={cn(inputClass(!!errors.engine_number), "uppercase")}
+                />
+              </Field>
+            </div>
+          </div>
 
-          {mutation.isError && (
-            <p className="text-xs font-medium text-theme-accent">
-              {(mutation.error as Error)?.message ?? "Failed to save vehicle."}
-            </p>
-          )}
+          {/* Status & Expirations */}
+          <div className="rounded-xl border border-gray-100 bg-[#f8f9fa] p-4 [color-scheme:light]">
+            <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Status & Expirations</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <Field label="Color (Optional)" error={errors.color?.message}>
+                  <input
+                    {...register("color")}
+                    placeholder="e.g. Pearl White"
+                    className={inputClass(!!errors.color)}
+                  />
+                </Field>
+              </div>
+              <Field label="Insurance Expiry" error={errors.insurance_expiry?.message}>
+                <input
+                  type="date"
+                  {...register("insurance_expiry")}
+                  className={inputClass(!!errors.insurance_expiry)}
+                />
+              </Field>
+              <Field label="Pollution Expiry" error={errors.pollution_expiry?.message}>
+                <input
+                  type="date"
+                  {...register("pollution_expiry")}
+                  className={inputClass(!!errors.pollution_expiry)}
+                />
+              </Field>
+            </div>
+          </div>
+          </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 border-t border-gray-100 bg-white px-5 py-4">
+            {mutation.isError && (
+              <p className="mr-auto text-xs font-medium text-theme-accent">
+                {(mutation.error as Error)?.message ?? "Failed to save vehicle."}
+              </p>
+            )}
             <button
               type="button"
               onClick={onClose}

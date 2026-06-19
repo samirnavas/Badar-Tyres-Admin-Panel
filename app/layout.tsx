@@ -48,6 +48,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+import { Toaster } from "sonner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -57,6 +59,7 @@ export default function RootLayout({
     <html lang="en" className={`${hankenGrotesk.variable} h-full`}>
       <body className="min-h-full bg-canvas text-gray-900 antialiased">
         <Providers>{children}</Providers>
+        <Toaster position="bottom-right" richColors />
       </body>
     </html>
   );

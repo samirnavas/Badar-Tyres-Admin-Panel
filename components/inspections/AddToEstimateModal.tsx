@@ -9,6 +9,7 @@ import { getSettings } from "@/lib/repositories/settings_repository";
 import type { InspectionItem } from "@/lib/models/Inspection";
 import { Combobox, type ComboboxOption } from "@/components/ui/Combobox";
 import { cn, formatCurrency } from "@/lib/format";
+import { toast } from "sonner";
 
 export function AddToEstimateModal({
   open,
@@ -112,8 +113,10 @@ export function AddToEstimateModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jobCard", jobId] });
       queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+      toast.success("Added to estimate");
       onClose();
     },
+    onError: (error) => toast.error(error.message || "Failed to add to estimate"),
   });
 
   useEffect(() => {

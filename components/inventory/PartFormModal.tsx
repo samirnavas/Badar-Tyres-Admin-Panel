@@ -15,6 +15,7 @@ import {
   type PartInput,
 } from "@/lib/models/Part";
 import { cn } from "@/lib/format";
+import { toast } from "sonner";
 
 const defaultValues: PartInput = {
   name: "",
@@ -75,11 +76,13 @@ export function PartFormModal({
       initialData
         ? updatePart(initialData.id, values)
         : createPart(values),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
       router.refresh();
+      toast.success(initialData ? `Part ${variables.name} updated` : `Part ${variables.name} added`);
       onClose();
     },
+    onError: (error) => toast.error(error.message || "Failed to save part"),
   });
 
   useEffect(() => {

@@ -4,11 +4,11 @@ import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft,
+  ChevronLeft,
   Printer,
   Loader2,
   CreditCard,
-  Mail,
+  Share2,
   CheckCircle2,
   Tag,
 } from "lucide-react";
@@ -19,6 +19,7 @@ import { ProcessPaymentModal } from "@/components/billing/ProcessPaymentModal";
 import { ApplyDiscountModal } from "@/components/billing/ApplyDiscountModal";
 import { cn, formatCurrency, formatDate } from "@/lib/format";
 import { useAuth } from "@/lib/AuthContext";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { InvoiceStatus } from "@/lib/models/Invoice";
 
 interface InvoiceLine {
@@ -51,7 +52,6 @@ export default function InvoicePage({
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [discountOpen, setDiscountOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [emailSending, setEmailSending] = useState(false);
 
   const jobQuery = useQuery({
     queryKey: ["job-card", jobId],
@@ -103,26 +103,18 @@ export default function InvoicePage({
     router.refresh();
   };
 
-  const sendEmailReceipt = async () => {
-    if (!invoice) return;
-    setEmailSending(true);
-    try {
-      const response = await fetch(`/api/invoices/${invoice.id}/send`, {
-        method: "POST",
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error ?? "Failed to send receipt email.");
+  const handleShare = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Invoice', url });
+      } catch (err) {
+        // User cancelled or share failed, ignore silently
       }
-      setToast(data.message ?? "Receipt email queued successfully.");
+    } else {
+      await navigator.clipboard.writeText(url);
+      setToast("Invoice link copied to clipboard");
       window.setTimeout(() => setToast(null), 4000);
-    } catch (error) {
-      setToast(
-        (error as Error)?.message ?? "Failed to send receipt email.",
-      );
-      window.setTimeout(() => setToast(null), 4000);
-    } finally {
-      setEmailSending(false);
     }
   };
 
@@ -168,48 +160,39 @@ export default function InvoicePage({
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back
-        </button>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {canApplyDiscount && invoice.status !== "Paid" && (
-            <button
-              onClick={() => setDiscountOpen(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-theme-accent bg-white px-4 py-2 text-sm font-semibold text-theme-accent transition-colors hover:bg-theme-accent/5"
-            >
-              <Tag className="h-4 w-4" /> Apply Discount
-            </button>
-          )}
-          {invoice.status !== "Paid" && (
-            <button
-              onClick={() => setPaymentOpen(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-900 bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
-            >
-              <CreditCard className="h-4 w-4" /> Process Payment
-            </button>
-          )}
+      <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-gray-200 pb-6 mb-6 gap-6 print:hidden">
+        {/* Left Side: Back Button & Title */}
+        <div className="flex flex-col gap-4">
           <button
-            onClick={sendEmailReceipt}
-            disabled={emailSending}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-50 disabled:opacity-60"
+            onClick={() => router.back()}
+            className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors w-fit pt-2"
           >
-            {emailSending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Mail className="h-4 w-4" />
-            )}
-            Send Email Receipt
+            <ChevronLeft className="w-4 h-4" />
+            Back
           </button>
+
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 ">
+              Invoice {invoice.id}
+            </h1>
+          </div>
+        </div>
+
+        {/* Right Side: Action Buttons */}
+        <div className="flex items-center gap-3">
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 rounded-lg bg-theme-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-theme-accent-dark"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 shadow-sm transition-colors"
           >
-            <Printer className="h-4 w-4" /> Print Invoice
+            <Printer className="w-4 h-4" />
+            Print
+          </button>
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-gray-900 rounded-xl hover:bg-gray-800 shadow-sm transition-colors"
+          >
+            <Share2 className="w-4 h-4" />
+            Share
           </button>
         </div>
       </div>
@@ -259,7 +242,7 @@ export default function InvoicePage({
                 <dd>
                   <span
                     className={cn(
-                      "inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                      "inline-flex bg-white  px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                       invoiceStatusStyles[invoice.status],
                     )}
                   >

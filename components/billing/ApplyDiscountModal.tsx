@@ -10,6 +10,7 @@ import { X, Loader2, Tag } from "lucide-react";
 import { applyDiscount } from "@/lib/repositories/invoice_repository";
 import type { Invoice } from "@/lib/models/Invoice";
 import { cn, formatCurrency } from "@/lib/format";
+import { toast } from "sonner";
 
 const discountSchema = z.object({
   discountType: z.enum(["fixed", "percentage"]),
@@ -108,10 +109,12 @@ export function ApplyDiscountModal({
       if (!invoice) throw new Error("Invoice not found");
       return applyDiscount(invoice.id, actualDiscountAmount, values.discountType);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success("Discount applied successfully");
       onSuccess();
       onClose();
     },
+    onError: (error) => toast.error(error.message || "Failed to apply discount"),
   });
 
   useEffect(() => {

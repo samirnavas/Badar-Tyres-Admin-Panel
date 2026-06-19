@@ -35,6 +35,7 @@ import {
 import type { JobCardStatus } from "@/lib/models/JobCard";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { InspectionReportPanel } from "@/components/inspections/InspectionReportPanel";
+import { toast } from "sonner";
 
 export default function JobPreviewPage({
   params,
@@ -71,15 +72,17 @@ export default function JobPreviewPage({
 
   const updateStatusMutation = useMutation({
     mutationFn: (newStatus: JobCardStatus) => updateJobStatus(id, newStatus),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["jobCard", id] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["job-cards"] });
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
       queryClient.invalidateQueries({ queryKey: ["bays"] });
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+      toast.success(`Job status updated to ${variables}`);
       router.refresh();
     },
+    onError: (error) => toast.error(error.message || "Failed to update status"),
   });
 
   const assignmentMutation = useMutation({
@@ -89,8 +92,10 @@ export default function JobPreviewPage({
       queryClient.invalidateQueries({ queryKey: ["jobCard", id] });
       queryClient.invalidateQueries({ queryKey: ["job-cards"] });
       queryClient.invalidateQueries({ queryKey: ["bays"] });
+      toast.success("Job assignments updated");
       router.refresh();
     },
+    onError: (error) => toast.error(error.message || "Failed to update assignments"),
   });
 
   const technicianOptions: ComboboxOption[] = useMemo(

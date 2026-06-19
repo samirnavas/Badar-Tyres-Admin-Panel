@@ -10,11 +10,9 @@ export default function SearchLoading() {
       </div>
 
       <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white px-6 py-10 text-center">
-        <Loader2 className="h-8 w-8 animate-spin text-theme-accent" />
-        <p className="mt-4 text-sm font-medium text-gray-900">Searching…</p>
-        <p className="mt-1 text-sm text-gray-500">
-          Looking for matches across customers, vehicles, and job cards
-        </p>
+        <Skeleton className="h-8 w-8 rounded-full mb-4" />
+        <Skeleton className="h-4 w-24 mb-1" />
+        <Skeleton className="h-3 w-64" />
       </div>
 
       <div className="space-y-4">

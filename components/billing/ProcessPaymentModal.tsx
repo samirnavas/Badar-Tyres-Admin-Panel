@@ -10,6 +10,7 @@ import { X, Loader2, CreditCard } from "lucide-react";
 import { recordPayment } from "@/lib/repositories/invoice_repository";
 import { paymentMethods, type Invoice } from "@/lib/models/Invoice";
 import { cn, formatCurrency } from "@/lib/format";
+import { toast } from "sonner";
 
 const paymentSchema = z.object({
   amountPaid: z
@@ -66,10 +67,12 @@ export function ProcessPaymentModal({
         paymentMethod: values.paymentMethod,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success(`Payment of ₹${formatCurrency(variables.amountPaid)} recorded`);
       onSuccess();
       onClose();
     },
+    onError: (error) => toast.error(error.message || "Failed to record payment"),
   });
 
   useEffect(() => {

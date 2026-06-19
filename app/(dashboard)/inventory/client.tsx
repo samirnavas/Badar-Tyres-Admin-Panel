@@ -82,19 +82,19 @@ export default function InventoryClient() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="w-full overflow-auto max-h-[calc(100vh-200px)]">
           <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/50 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                <th className="px-5 py-3">SKU</th>
-                <th className="px-5 py-3">Name</th>
-                <th className="px-5 py-3">Brand</th>
-                <th className="px-5 py-3">Category</th>
-                <th className="px-5 py-3 text-right">Retail Price</th>
-                <th className="px-5 py-3 text-right">Stock Level</th>
+            <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur shadow-[0_1px_0_rgba(0,0,0,0.1)] text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <tr className="border-b border-gray-100">
+                <th className="px-3 py-2">SKU</th>
+                <th className="px-3 py-2">Name</th>
+                <th className="px-3 py-2">Brand</th>
+                <th className="px-3 py-2">Category</th>
+                <th className="px-3 py-2 text-right">Retail Price</th>
+                <th className="px-3 py-2 text-right">Stock Level</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 text-sm">
               {isLoading && (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-gray-500">
@@ -127,14 +127,14 @@ export default function InventoryClient() {
                       onClick={() => openEditModal(part)}
                       className="cursor-pointer transition-colors hover:bg-gray-50"
                     >
-                      <td className="px-5 py-3 font-mono text-xs font-medium text-gray-600">
+                      <td className="px-3 py-2 font-mono text-xs font-medium text-gray-600">
                         {part.sku}
                       </td>
-                      <td className="px-5 py-3 font-medium text-gray-900">
+                      <td className="px-3 py-2 font-medium text-gray-900">
                         {part.name}
                       </td>
-                      <td className="px-5 py-3 text-gray-600">{part.brand}</td>
-                      <td className="px-5 py-3">
+                      <td className="px-3 py-2 text-gray-600">{part.brand}</td>
+                      <td className="px-3 py-2">
                         <span
                           className={cn(
                             "inline-flex rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
@@ -144,10 +144,10 @@ export default function InventoryClient() {
                           {part.category}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-right font-medium text-gray-900 tabular-nums">
+                      <td className="px-3 py-2 text-right font-medium text-gray-900 tabular-nums">
                         ₹{formatCurrency(part.retailPrice)}
                       </td>
-                      <td className="px-5 py-3 text-right">
+                      <td className="px-3 py-2 text-right">
                         <span className="inline-flex items-center justify-end gap-1.5 font-semibold tabular-nums text-gray-900">
                           {part.stockLevel}
                           {isLowStock && (

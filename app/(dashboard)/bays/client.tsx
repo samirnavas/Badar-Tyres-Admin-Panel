@@ -21,6 +21,7 @@ import { normalizeJobStatus, getJobBayId, getJobTechnicianId } from "@/lib/model
 import type { Bay } from "@/lib/models/Bay";
 import { cn } from "@/lib/format";
 import { BayFormModal } from "@/components/bays/BayFormModal";
+import { toast } from "sonner";
 
 const statusStyles: Record<
   Bay["status"],
@@ -141,7 +142,9 @@ export default function BaysClient() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+      toast.success("Job queue reordered successfully");
     },
+    onError: (error) => toast.error(error.message || "Failed to reorder jobs"),
   });
 
   const handleReorder = (bayId: string, index: number, direction: "up" | "down") => {

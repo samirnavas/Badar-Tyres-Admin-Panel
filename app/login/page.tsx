@@ -15,6 +15,7 @@ import {
   saveLoginCredentials,
 } from "@/lib/auth-storage";
 import { Loader2, User as UserIcon, Lock, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -74,10 +75,12 @@ export default function LoginPage() {
         variables.rememberMe,
       );
       login(data.token, normalizeAuthUser(data.user), variables.rememberMe);
+      toast.success("Login successful");
       router.replace("/dashboard");
     },
     onError: (err: Error) => {
       setErrorMsg(err.message || "Failed to login. Check your credentials.");
+      toast.error(err.message || "Login failed");
     },
   });
 

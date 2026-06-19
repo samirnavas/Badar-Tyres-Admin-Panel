@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, FormEvent, useRef } from "react";
 import { Search, RefreshCw, Menu, LogOut, ChevronDown, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -18,12 +18,25 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const [isSearching, setIsSearching] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     setSearchQuery(searchParams.get("search") || "");
     if (pathname === "/search") {
       setIsSearching(false);
     }
   }, [searchParams, pathname]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const name = user?.name || "Workshop Manager";
   const initials = name
@@ -61,21 +74,27 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
         <Menu className="h-5 w-5" />
       </button>
 
-      <form onSubmit={handleSearch} className="relative flex-1 max-w-xl">
+      <form onSubmit={handleSearch} className="relative flex-1 max-w-xl group">
         {isSearching ? (
           <Loader2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-theme-accent" />
         ) : (
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         )}
         <input
+          ref={searchInputRef}
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search orders, clients, or vehicles..."
           disabled={isSearching}
           aria-busy={isSearching}
-          className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-theme-accent focus:bg-white focus:outline-none focus:ring-1 focus:ring-theme-accent disabled:opacity-70"
+          className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 placeholder:text-gray-400 focus:border-theme-accent focus:bg-white focus:outline-none focus:ring-1 focus:ring-theme-accent disabled:opacity-70 transition-colors"
         />
+        <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 opacity-100 transition-opacity group-focus-within:opacity-0">
+          <kbd className="inline-flex h-5 items-center gap-1 rounded border border-gray-200 bg-gray-100 px-1.5 font-mono text-[10px] font-medium text-gray-500">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </div>
       </form>
 
       <div className="ml-auto flex items-center gap-1 sm:gap-2">

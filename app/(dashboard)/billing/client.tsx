@@ -11,6 +11,7 @@ import {
 import { getCustomers } from "@/lib/repositories";
 import type { Invoice, InvoiceStatus } from "@/lib/models/Invoice";
 import { cn, formatCurrency, formatDate } from "@/lib/format";
+import { useRouter } from "next/navigation";
 
 type SortField = "status" | "createdAt";
 type SortDirection = "asc" | "desc";
@@ -121,13 +122,13 @@ export default function BillingClient() {
           <h2 className="text-sm font-semibold text-gray-900">All Invoices</h2>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="w-full overflow-auto max-h-[calc(100vh-200px)]">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200/80 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                <th className="px-5 py-3.5">Invoice</th>
-                <th className="px-5 py-3.5">Customer</th>
-                <th className="px-5 py-3.5">
+            <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur shadow-[0_1px_0_rgba(0,0,0,0.1)] text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <tr className="border-b border-gray-200/80 text-left">
+                <th className="px-3 py-2">Invoice</th>
+                <th className="px-3 py-2">Customer</th>
+                <th className="px-3 py-2">
                   <SortButton
                     label="Status"
                     active={sortField === "status"}
@@ -135,9 +136,9 @@ export default function BillingClient() {
                     onClick={() => toggleSort("status")}
                   />
                 </th>
-                <th className="px-5 py-3.5 text-right">Total</th>
-                <th className="px-5 py-3.5 text-right">Paid</th>
-                <th className="px-5 py-3.5">
+                <th className="px-3 py-2 text-right">Total</th>
+                <th className="px-3 py-2 text-right">Paid</th>
+                <th className="px-3 py-2">
                   <SortButton
                     label="Created"
                     active={sortField === "createdAt"}
@@ -145,15 +146,14 @@ export default function BillingClient() {
                     onClick={() => toggleSort("createdAt")}
                   />
                 </th>
-                <th className="px-5 py-3.5" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 text-sm">
               {isLoading &&
                 Array.from({ length: 4 }).map((_, index) => (
                   <tr key={index}>
-                    {Array.from({ length: 7 }).map((__, cell) => (
-                      <td key={cell} className="px-5 py-4">
+                    {Array.from({ length: 6 }).map((__, cell) => (
+                      <td key={cell} className="px-3 py-2">
                         <div className="h-4 animate-pulse rounded bg-gray-200" />
                       </td>
                     ))}
@@ -174,8 +174,8 @@ export default function BillingClient() {
               {!isLoading && sortedInvoices.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
-                    className="px-5 py-12 text-center text-sm text-gray-500"
+                    colSpan={6}
+                    className="px-3 py-4 text-center text-sm text-gray-500"
                   >
                     No invoices found.
                   </td>
@@ -255,13 +255,17 @@ function InvoiceRow({
   invoice: Invoice;
   customerName: string;
 }) {
+  const router = useRouter();
   return (
-    <tr className="transition-colors hover:bg-gray-50/80">
-      <td className="px-5 py-4 font-mono text-xs font-medium text-gray-600">
+    <tr
+      onClick={() => router.push(`/jobs/${invoice.jobId}/invoice`)}
+      className="cursor-pointer transition-colors hover:bg-gray-50/80"
+    >
+      <td className="px-3 py-2 font-mono text-xs font-medium text-gray-600">
         #{invoice.id.slice(0, 8).toUpperCase()}
       </td>
-      <td className="px-5 py-4 font-medium text-gray-900">{customerName}</td>
-      <td className="px-5 py-4">
+      <td className="px-3 py-2 font-medium text-gray-900">{customerName}</td>
+      <td className="px-3 py-2">
         <span
           className={cn(
             "inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
@@ -271,22 +275,14 @@ function InvoiceRow({
           {invoice.status}
         </span>
       </td>
-      <td className="px-5 py-4 text-right font-medium text-gray-900 tabular-nums">
+      <td className="px-3 py-2 text-right font-medium text-gray-900 tabular-nums">
         ₹{formatCurrency(invoice.total)}
       </td>
-      <td className="px-5 py-4 text-right text-gray-600 tabular-nums">
+      <td className="px-3 py-2 text-right text-gray-600 tabular-nums">
         ₹{formatCurrency(invoice.amountPaid)}
       </td>
-      <td className="px-5 py-4 text-gray-500">
+      <td className="px-3 py-2 text-gray-500">
         {formatDate(invoice.createdAt)}
-      </td>
-      <td className="px-5 py-4 text-right">
-        <Link
-          href={`/jobs/${invoice.jobId}/invoice`}
-          className="text-xs font-semibold text-gray-900 underline-offset-2 hover:underline"
-        >
-          View
-        </Link>
       </td>
     </tr>
   );

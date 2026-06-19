@@ -4,7 +4,7 @@ import { Suspense, useDeferredValue, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Users, Truck, Loader2 } from "lucide-react";
+import { FileText, Users, Truck, Loader2, Search } from "lucide-react";
 import {
   getCustomers,
   getJobCards,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/repositories";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getJobLineItems, getJobPrimaryLineLabel } from "@/lib/models/JobCard";
 import { normalizeSearchQuery, matchesAnySearchQuery } from "@/lib/search";
@@ -165,9 +166,11 @@ function SearchResults() {
       )}
 
       {!isSearching && !isError && totalResults === 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-500">
-          Try a customer name, phone number, registration plate, or job status.
-        </div>
+        <EmptyState
+          icon={<Search className="h-6 w-6" />}
+          title={`No results for "${rawQuery.trim()}"`}
+          description="Try a customer name, phone number, registration plate, or job status."
+        />
       )}
 
       {!isSearching && !isError && customers.length > 0 && (

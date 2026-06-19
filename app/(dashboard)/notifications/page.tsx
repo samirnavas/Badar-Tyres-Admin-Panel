@@ -2,6 +2,8 @@ import { getExpiringNotifications } from "@/lib/repositories/vehicle_repository"
 import Link from "next/link";
 import { Bell } from "lucide-react";
 
+import { EmptyState } from "@/components/ui/EmptyState";
+
 export const dynamic = 'force-dynamic';
 
 export default async function NotificationsPage() {
@@ -18,13 +20,12 @@ export default async function NotificationsPage() {
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         {notifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 mb-4">
-              <Bell className="h-6 w-6" />
-            </div>
-            <p className="text-lg font-medium text-gray-900">No new notifications</p>
-            <p className="mt-1 text-sm text-gray-500">You are all caught up!</p>
-          </div>
+          <EmptyState
+            icon={<Bell className="h-6 w-6" />}
+            title="No new notifications"
+            description="You are all caught up!"
+            className="border-none"
+          />
         ) : (
           <ul className="divide-y divide-gray-100">
             {notifications.map((notification) => (

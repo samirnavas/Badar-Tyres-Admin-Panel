@@ -41,6 +41,7 @@ import { cn, formatCurrency } from "@/lib/format";
 import { createJobCardSchema, type CreateJobCardForm } from "./schema";
 import { Combobox, type ComboboxOption } from "@/components/ui/Combobox";
 import { CustomerFormModal } from "@/components/customers/CustomerFormModal";
+import { toast } from "sonner";
 
 const VEHICLE_TYPES = ["Car", "Bike", "Others"] as const;
 
@@ -250,8 +251,10 @@ function CreateJobForm() {
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
       queryClient.invalidateQueries({ queryKey: ["vehicles-by-customer"] });
+      toast.success("Job card created successfully");
       router.refresh();
     },
+    onError: (error) => toast.error(error.message || "Failed to create job card"),
   });
 
   const customerOptions: ComboboxOption[] = useMemo(
@@ -1016,8 +1019,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-gray-200 bg-white">
-      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
+    <section className="rounded-xl border border-gray-200/60 bg-[#f8f9fa] [color-scheme:light]">
+      <div className="flex items-center justify-between border-b border-gray-200/40 px-5 py-3.5">
         <div className="flex items-center gap-2 text-gray-900">
           <span className="text-gray-500">{icon}</span>
           <h2 className="text-sm font-semibold">{title}</h2>
