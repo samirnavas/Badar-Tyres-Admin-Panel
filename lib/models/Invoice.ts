@@ -14,6 +14,8 @@ export interface Invoice {
   amountPaid: number;
   status: InvoiceStatus;
   paymentMethod: PaymentMethod | null;
+  discountAmount: number;
+  discountType: "fixed" | "percentage";
   createdAt: string;
   updatedAt: string;
 }

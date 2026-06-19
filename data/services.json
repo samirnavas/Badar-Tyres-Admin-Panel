@@ -10,7 +10,7 @@
   {
     "name": "Pollution Test",
     "category": "Labor",
-    "price": 0,
+    "price": 80,
     "gst_rate": 18,
     "in_stock": true,
     "id": "srv_1781686280175_vtnzdvp"

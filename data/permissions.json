@@ -9,7 +9,8 @@
     "/inventory",
     "/customers",
     "/bays",
-    "/billing"
+    "/billing",
+    "action:apply_discount"
   ],
   "Supervisor": [
     "/dashboard",

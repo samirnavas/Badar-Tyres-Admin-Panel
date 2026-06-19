@@ -1,16 +1,63 @@
 [
   {
-    "jobId": "21c18771-ef24-496c-b014-b5285699eb1d",
-    "customerId": "5aa6e58d-ca22-4d7f-807d-97a46f39753a",
-    "subtotal": 1200,
-    "tax": 216,
-    "total": 1416,
+    "jobId": "37497c6a-abfd-47fb-9413-37493a5a653f",
+    "customerId": "5d1b95b3-770a-43f8-a765-c3dcda115990",
+    "subtotal": 1100,
+    "tax": 198,
+    "total": 1100,
     "amountPaid": 0,
     "status": "Unpaid",
     "paymentMethod": null,
+    "discountAmount": 198,
+    "discountType": "fixed",
+    "id": "4a502d6f-1e26-4e62-91ab-98d5dc881546",
+    "createdAt": "2026-06-19T15:04:58.014Z",
+    "updatedAt": "2026-06-19T15:05:08.959Z"
+  },
+  {
+    "jobId": "565655eb-8d55-452c-8de3-2ca2c052a551",
+    "customerId": "b6b2acfd-c100-43d6-a95a-04e2d0a685c0",
+    "subtotal": 80,
+    "tax": 0,
+    "total": 80,
+    "amountPaid": 0,
+    "status": "Unpaid",
+    "paymentMethod": null,
+    "discountAmount": 0,
+    "discountType": "fixed",
+    "id": "7b8c16be-be30-4e61-a264-872e3da3cc49",
+    "createdAt": "2026-06-19T15:02:47.813Z",
+    "updatedAt": "2026-06-19T15:02:47.813Z"
+  },
+  {
+    "jobId": "job_1",
+    "customerId": "cust_1",
+    "subtotal": 200,
+    "tax": 36,
+    "total": 200,
+    "amountPaid": 200,
+    "status": "Paid",
+    "paymentMethod": "Cash",
+    "discountAmount": 36,
+    "discountType": "fixed",
+    "id": "4817f22a-dfb1-4e57-8fe6-955678e8e815",
+    "createdAt": "2026-06-19T14:53:05.471Z",
+    "updatedAt": "2026-06-19T14:53:17.227Z"
+  },
+  {
+    "jobId": "21c18771-ef24-496c-b014-b5285699eb1d",
+    "customerId": "5aa6e58d-ca22-4d7f-807d-97a46f39753a",
+    "subtotal": 1200,
+    "tax": 0,
+    "total": 0,
+    "amountPaid": 0,
+    "status": "Unpaid",
+    "paymentMethod": "Cash",
     "id": "69a2a385-df08-45a6-bc7d-e2677f7db8b7",
     "createdAt": "2026-06-18T07:39:30.995Z",
-    "updatedAt": "2026-06-18T07:39:30.995Z"
+    "updatedAt": "2026-06-19T14:44:16.641Z",
+    "discountAmount": 1200,
+    "discountType": "fixed"
   },
   {
     "jobId": "b3723bff-b8b2-4d82-b51b-dacd4f33f091",
@@ -43,12 +90,14 @@
     "jobId": "f5ab696a-ecdc-42d5-b7e4-020c157c0991",
     "customerId": "b6b2acfd-c100-43d6-a95a-04e2d0a685c0",
     "subtotal": 1200,
-    "tax": 216,
-    "total": 1416,
+    "tax": 90,
+    "total": 500,
     "amountPaid": 500,
-    "status": "Partial",
+    "status": "Paid",
     "paymentMethod": "Cash",
     "createdAt": "2026-06-16T08:30:00.000Z",
-    "updatedAt": "2026-06-16T09:00:00.000Z"
+    "updatedAt": "2026-06-19T14:56:40.376Z",
+    "discountAmount": 90,
+    "discountType": "fixed"
   }
 ]

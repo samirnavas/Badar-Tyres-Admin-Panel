@@ -10,12 +10,15 @@ import {
   CreditCard,
   Mail,
   CheckCircle2,
+  Tag,
 } from "lucide-react";
 import { getJobCardById, getSettings } from "@/lib/repositories";
 import { getOrCreateInvoiceForJob } from "@/lib/repositories/invoice_repository";
 import { getJobLineItems } from "@/lib/models/JobCard";
 import { ProcessPaymentModal } from "@/components/billing/ProcessPaymentModal";
+import { ApplyDiscountModal } from "@/components/billing/ApplyDiscountModal";
 import { cn, formatCurrency, formatDate } from "@/lib/format";
+import { useAuth } from "@/lib/AuthContext";
 import type { InvoiceStatus } from "@/lib/models/Invoice";
 
 interface InvoiceLine {
@@ -42,8 +45,11 @@ export default function InvoicePage({
   const { id: jobId } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canApplyDiscount = hasPermission("action:apply_discount");
 
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [discountOpen, setDiscountOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [emailSending, setEmailSending] = useState(false);
 
@@ -171,6 +177,14 @@ export default function InvoicePage({
         </button>
 
         <div className="flex flex-wrap items-center gap-2">
+          {canApplyDiscount && invoice.status !== "Paid" && (
+            <button
+              onClick={() => setDiscountOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-theme-accent bg-white px-4 py-2 text-sm font-semibold text-theme-accent transition-colors hover:bg-theme-accent/5"
+            >
+              <Tag className="h-4 w-4" /> Apply Discount
+            </button>
+          )}
           {invoice.status !== "Paid" && (
             <button
               onClick={() => setPaymentOpen(true)}
@@ -336,6 +350,21 @@ export default function InvoicePage({
               <dt>Subtotal</dt>
               <dd className="tabular-nums">₹ {formatCurrency(invoice.subtotal)}</dd>
             </div>
+            {invoice.discountAmount > 0 && (
+              <div className="flex justify-between text-theme-accent">
+                <dt>
+                  Discount
+                  {invoice.discountType === "percentage" && ` (${invoice.discountAmount}%)`}
+                </dt>
+                <dd className="tabular-nums">
+                  -₹ {formatCurrency(
+                    invoice.discountType === "percentage"
+                      ? (job.subtotal + job.total_tax) * (invoice.discountAmount / 100)
+                      : invoice.discountAmount
+                  )}
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between text-gray-600">
               <dt>Total Tax</dt>
               <dd className="tabular-nums">₹ {formatCurrency(invoice.tax)}</dd>
@@ -390,6 +419,14 @@ export default function InvoicePage({
         open={paymentOpen}
         onClose={() => setPaymentOpen(false)}
         invoice={invoice}
+        onSuccess={handlePaymentSuccess}
+      />
+      <ApplyDiscountModal
+        open={discountOpen}
+        onClose={() => setDiscountOpen(false)}
+        invoice={invoice}
+        originalSubtotal={job.subtotal}
+        originalTax={job.total_tax}
         onSuccess={handlePaymentSuccess}
       />
     </div>

@@ -110,11 +110,60 @@ class InvoiceRepository {
     }
 
     const current = invoices[index];
+
     const updatedInvoice: Invoice = {
       ...current,
       amountPaid: payment.amountPaid,
       paymentMethod: payment.paymentMethod,
       status: deriveInvoiceStatus(payment.amountPaid, current.total),
+      updatedAt: new Date().toISOString(),
+    };
+
+    invoices[index] = updatedInvoice;
+    await writeData(FILE_NAME, invoices);
+
+    if (updatedInvoice.status === "Paid") {
+      await this.closeParentJob(updatedInvoice.jobId);
+    }
+
+    return updatedInvoice;
+  }
+
+  async applyDiscount(
+    id: string,
+    discountAmount: number,
+    discountType: "fixed" | "percentage",
+  ): Promise<Invoice> {
+    await simulateLatency();
+
+    const invoices = await readData<Invoice[]>(FILE_NAME);
+    const index = invoices.findIndex((invoice) => invoice.id === id);
+    if (index === -1) {
+      throw new Error("Invoice not found");
+    }
+
+    const current = invoices[index];
+
+    const jobs = await readData<JobCard[]>(JOBS_FILE);
+    const job = jobs.find((j) => j.id === current.jobId);
+    if (!job) throw new Error("Job not found");
+
+    const originalTotal = job.total_amount;
+
+    const discountValue =
+      discountType === "percentage"
+        ? originalTotal * (discountAmount / 100)
+        : discountAmount;
+
+    const newTotal = Math.max(0, originalTotal - discountValue);
+
+    const updatedInvoice: Invoice = {
+      ...current,
+      discountAmount,
+      discountType,
+      tax: job.total_tax,
+      total: newTotal,
+      status: deriveInvoiceStatus(current.amountPaid, newTotal),
       updatedAt: new Date().toISOString(),
     };
 
@@ -156,6 +205,8 @@ class InvoiceRepository {
       amountPaid: 0,
       status: "Unpaid",
       paymentMethod: null,
+      discountAmount: 0,
+      discountType: "fixed",
     });
   }
 
@@ -213,6 +264,14 @@ export async function getOrCreateInvoiceForJob(
   jobId: string,
 ): Promise<Invoice | null> {
   return invoiceRepository.getOrCreateInvoiceForJob(jobId);
+}
+
+export async function applyDiscount(
+  id: string,
+  discountAmount: number,
+  discountType: "fixed" | "percentage",
+): Promise<Invoice> {
+  return invoiceRepository.applyDiscount(id, discountAmount, discountType);
 }
 
 export interface BillingMetrics {

@@ -85,3 +85,23 @@ export async function deleteUser(id: string, actingUserId: string): Promise<void
   const filtered = users.filter((u) => u.id !== id);
   await writeData(FILE_NAME, filtered);
 }
+
+export async function verifyLogin(username: string, password: string): Promise<{ token: string; user: User }> {
+  await simulateLatency();
+  const users = await readData<(User & { password?: string })[]>(FILE_NAME);
+  
+  const user = users.find(
+    (u) => u.username?.toLowerCase() === username.toLowerCase()
+  );
+
+  if (!user || user.password !== password) {
+    throw new Error('Invalid username or password');
+  }
+
+  const { password: _, ...safeUser } = user;
+
+  return {
+    token: `token-${safeUser.id}-${Date.now()}`,
+    user: safeUser as User,
+  };
+}

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { verifyLogin } from "@/lib/repositories/user_repository";
 import { useAuth } from "@/lib/AuthContext";
 import {
   getSavedCredentials,
@@ -66,7 +66,7 @@ export default function LoginPage() {
 
   const loginMutation = useMutation({
     mutationFn: ({ username, password }: LoginForm) =>
-      api.login({ username, password }),
+      verifyLogin(username, password),
     onSuccess: (data, variables) => {
       saveLoginCredentials(
         variables.username,

@@ -11,6 +11,7 @@ export const PERMISSION_MODULES = [
   { label: "Vehicles", route: "/vehicles" },
   { label: "Notifications", route: "/notifications" },
   { label: "Settings", route: "/settings" },
+  { label: "Apply Discounts", route: "action:apply_discount" },
 ] as const;
 
 export const EDITABLE_ROLES = [
@@ -30,6 +31,7 @@ export const ROUTE_PERMISSION_PREFIX: Record<string, string> = {
 };
 
 export function resolvePermissionPrefix(pathname: string): string {
+  if (pathname.startsWith("action:")) return pathname;
   const base = "/" + pathname.split("/").filter(Boolean)[0];
   return ROUTE_PERMISSION_PREFIX[base] ?? base;
 }
