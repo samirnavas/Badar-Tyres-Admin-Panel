@@ -318,7 +318,7 @@ function CreateJobForm() {
         );
         const queueCount = queuedJobs.length;
 
-        let hint = bay.status;
+        let hint: string = bay.status;
         if (queueCount > 0) {
           hint = `${queueCount} in queue`;
         }

@@ -613,3 +613,26 @@ export async function getRevenueTrend(timeframe: Timeframe = "week"): Promise<Re
 
   return Object.entries(buckets).map(([name, revenue]) => ({ name, revenue }));
 }
+
+/**
+ * Updates the queue order for a list of job IDs.
+ */
+export async function updateJobQueueOrder(jobIds: string[]): Promise<void> {
+  await simulateLatency();
+
+  const jobs = await readData<JobCard[]>(FILE_NAME);
+  let modified = false;
+
+  jobIds.forEach((id, index) => {
+    const jobIndex = jobs.findIndex(j => j.id === id);
+    if (jobIndex !== -1 && jobs[jobIndex].queue_index !== index) {
+      jobs[jobIndex].queue_index = index;
+      jobs[jobIndex].updated_at = new Date().toISOString();
+      modified = true;
+    }
+  });
+
+  if (modified) {
+    await writeData(FILE_NAME, jobs);
+  }
+}
