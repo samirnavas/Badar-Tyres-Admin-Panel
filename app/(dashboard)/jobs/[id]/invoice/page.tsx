@@ -11,6 +11,7 @@ import {
   Share2,
   CheckCircle2,
   Tag,
+  ArrowLeft,
 } from "lucide-react";
 import { getJobCardById, getSettings } from "@/lib/repositories";
 import { getOrCreateInvoiceForJob } from "@/lib/repositories/invoice_repository";
