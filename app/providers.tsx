@@ -3,11 +3,24 @@
 import { useState } from "react";
 import {
   QueryClient,
-  QueryClientProvider,
   defaultShouldDehydrateQuery,
 } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { AuthProvider } from "@/lib/AuthContext";
 import { PWARegister } from "@/components/PWARegister";
+import { OfflineBanner } from "@/components/OfflineBanner";
+
+const noopStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
+const persister = createSyncStoragePersister({
+  storage:
+    typeof window !== "undefined" ? window.localStorage : noopStorage,
+});
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -15,23 +28,34 @@ export function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 30 * 1000,
+            networkMode: "offlineFirst",
+            staleTime: 1000 * 60 * 5,
+            gcTime: 1000 * 60 * 60 * 24,
             refetchOnWindowFocus: false,
             retry: 1,
           },
-          dehydrate: {
-            shouldDehydrateQuery: defaultShouldDehydrateQuery,
+          mutations: {
+            networkMode: "offlineFirst",
           },
         },
       }),
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister,
+        dehydrateOptions: {
+          shouldDehydrateQuery: defaultShouldDehydrateQuery,
+        },
+      }}
+    >
       <AuthProvider>
+        <OfflineBanner />
         {children}
         <PWARegister />
       </AuthProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }

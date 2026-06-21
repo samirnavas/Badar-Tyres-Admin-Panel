@@ -32,7 +32,7 @@ import {
   getJobBayId,
   normalizeJobStatus,
 } from "@/lib/models/JobCard";
-import type { JobCardStatus } from "@/lib/models/JobCard";
+import type { JobCard, JobCardStatus } from "@/lib/models/JobCard";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { InspectionReportPanel } from "@/components/inspections/InspectionReportPanel";
 import { toast } from "sonner";
@@ -72,17 +72,35 @@ export default function JobPreviewPage({
 
   const updateStatusMutation = useMutation({
     mutationFn: (newStatus: JobCardStatus) => updateJobStatus(id, newStatus),
+    onMutate: async (newStatus) => {
+      await queryClient.cancelQueries({ queryKey: ["jobCard", id] });
+      const previousJob = queryClient.getQueryData<JobCard>(["jobCard", id]);
+      if (previousJob) {
+        queryClient.setQueryData<JobCard>(["jobCard", id], {
+          ...previousJob,
+          status: newStatus,
+        });
+      }
+      return { previousJob };
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previousJob) {
+        queryClient.setQueryData(["jobCard", id], context.previousJob);
+      }
+      toast.error(error.message || "Failed to update status");
+    },
     onSuccess: (_, variables) => {
+      toast.success(`Job status updated to ${variables}`);
+      router.refresh();
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["jobCard", id] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["job-cards"] });
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
       queryClient.invalidateQueries({ queryKey: ["bays"] });
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
-      toast.success(`Job status updated to ${variables}`);
-      router.refresh();
     },
-    onError: (error) => toast.error(error.message || "Failed to update status"),
   });
 
   const assignmentMutation = useMutation({
