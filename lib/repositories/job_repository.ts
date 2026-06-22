@@ -4,15 +4,21 @@ import type { JobCard, JobCardLineItem, JobCardStatus } from "../models/JobCard"
 import { getJobLineItems, getJobBayId, normalizeJobStatus } from "../models/JobCard";
 import type { Customer } from "../models/Customer";
 import type { Vehicle } from "../models/Vehicle";
-import { readData, writeData } from "../db";
+import { assertNoError, firstOrNull } from "../database/helpers";
+import {
+  customerFromRow,
+  jobFromRow,
+  jobToRow,
+  vehicleFromRow,
+  vehicleToRow,
+  type CustomerRow,
+  type JobRow,
+  type VehicleRow,
+} from "../database/mappers";
 import { generateId } from "../generateId";
+import { supabase } from "../supabase";
 import { simulateLatency } from "./delay";
-import { getPartById, updatePart } from "./part_repository";
 import { getBayById, setBayStatus } from "./bay_repository";
-
-const FILE_NAME = "jobs.json";
-const CUSTOMERS_FILE = "customers.json";
-const VEHICLES_FILE = "vehicles.json";
 
 /**
  * A JobCard with its related Customer and Vehicle records joined in.
@@ -35,21 +41,9 @@ export type CreateJobCardInput = Omit<
 };
 
 async function deductInventoryForLineItems(
-  lineItems: JobCardLineItem[],
+  _lineItems: JobCardLineItem[],
 ): Promise<void> {
-  return; // Disconnected inventory feature for now
-  /*
-  for (const item of lineItems) {
-    if (!item.partId) continue;
-
-    const part = await getPartById(item.partId);
-    if (!part) continue;
-
-    await updatePart(item.partId, {
-      stockLevel: Math.max(0, part.stockLevel - item.quantity),
-    });
-  }
-  */
+  return;
 }
 
 function shouldDeductInventory(
@@ -75,17 +69,23 @@ function normalizeJobRecord(job: JobCard): JobCard {
   };
 }
 
+async function fetchJobs(): Promise<JobCard[]> {
+  const result = await supabase.from("jobs").select("*");
+  const rows = assertNoError(result, "fetchJobs") as JobRow[];
+  return (rows ?? []).map((row) => normalizeJobRecord(jobFromRow(row)));
+}
+
 async function releaseBay(bayId: string | null | undefined, excludeJobId?: string): Promise<void> {
   if (!bayId) return;
   const bay = await getBayById(bayId);
   if (bay && bay.status === "Occupied") {
-    const jobs = await readData<JobCard[]>(FILE_NAME);
+    const result = await supabase.from("jobs").select("*").eq("bay_id", bayId);
+    const jobs = (assertNoError(result, "releaseBay") as JobRow[]).map((row) => jobFromRow(row));
     const queuedJobs = jobs.filter(
       (job) =>
-        job.bayId === bayId &&
         job.id !== excludeJobId &&
         (normalizeJobStatus(job.status) === "In Progress" ||
-          normalizeJobStatus(job.status) === "Approved")
+          normalizeJobStatus(job.status) === "Approved"),
     );
     if (queuedJobs.length === 0) {
       await setBayStatus(bayId, "Open");
@@ -106,13 +106,28 @@ async function occupyBay(bayId: string): Promise<void> {
   }
 }
 
+async function joinJobRelations(jobCard: JobCard): Promise<JobCardWithRelations> {
+  const [customerResult, vehicleResult] = await Promise.all([
+    supabase.from("customers").select("*").eq("id", jobCard.customer_id).limit(1),
+    supabase.from("vehicles").select("*").eq("id", jobCard.vehicle_id).limit(1),
+  ]);
+
+  const customerRow = firstOrNull(assertNoError(customerResult, "joinJobRelations") as CustomerRow[]);
+  const vehicleRow = firstOrNull(assertNoError(vehicleResult, "joinJobRelations") as VehicleRow[]);
+
+  return {
+    ...jobCard,
+    customer: customerRow ? customerFromRow(customerRow) : null,
+    vehicle: vehicleRow ? vehicleFromRow(vehicleRow) : null,
+  };
+}
+
 /**
  * Returns all job cards.
  */
 export async function getJobCards(): Promise<JobCard[]> {
   await simulateLatency();
-  const jobs = await readData<JobCard[]>(FILE_NAME);
-  return jobs.map(normalizeJobRecord);
+  return fetchJobs();
 }
 
 /**
@@ -123,14 +138,13 @@ export async function getJobCardsByCustomerId(
   customerId: string,
 ): Promise<JobCard[]> {
   await simulateLatency();
-  const jobs = await readData<JobCard[]>(FILE_NAME);
-  return jobs
-    .map(normalizeJobRecord)
-    .filter((job) => job.customer_id === customerId)
-    .sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
+  const result = await supabase
+    .from("jobs")
+    .select("*")
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false });
+  const rows = assertNoError(result, "getJobCardsByCustomerId") as JobRow[];
+  return (rows ?? []).map((row) => normalizeJobRecord(jobFromRow(row)));
 }
 
 /**
@@ -142,19 +156,11 @@ export async function getJobCardById(
 ): Promise<JobCardWithRelations | null> {
   await simulateLatency();
 
-  const jobs = await readData<JobCard[]>(FILE_NAME);
-  const rawJob = jobs.find((job) => job.id === id);
-  if (!rawJob) return null;
+  const result = await supabase.from("jobs").select("*").eq("id", id).limit(1);
+  const row = firstOrNull(assertNoError(result, "getJobCardById") as JobRow[]);
+  if (!row) return null;
 
-  const jobCard = normalizeJobRecord(rawJob);
-
-  const customers = await readData<Customer[]>(CUSTOMERS_FILE);
-  const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
-
-  const customer = customers.find((c) => c.id === jobCard.customer_id) ?? null;
-  const vehicle = vehicles.find((v) => v.id === jobCard.vehicle_id) ?? null;
-
-  return { ...jobCard, customer, vehicle };
+  return joinJobRelations(normalizeJobRecord(jobFromRow(row)));
 }
 
 /**
@@ -162,17 +168,37 @@ export async function getJobCardById(
  */
 export async function getRecentJobsWithRelations(): Promise<JobCardWithRelations[]> {
   await simulateLatency();
-  const jobs = await readData<JobCard[]>(FILE_NAME);
-  const customers = await readData<Customer[]>(CUSTOMERS_FILE);
-  const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
-  
+  const jobs = await fetchJobs();
+
+  const customerIds = [...new Set(jobs.map((job) => job.customer_id))];
+  const vehicleIds = [...new Set(jobs.map((job) => job.vehicle_id))];
+
+  const [customersResult, vehiclesResult] = await Promise.all([
+    customerIds.length
+      ? supabase.from("customers").select("*").in("id", customerIds)
+      : Promise.resolve({ data: [], error: null }),
+    vehicleIds.length
+      ? supabase.from("vehicles").select("*").in("id", vehicleIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const customers = new Map(
+    ((assertNoError(customersResult, "getRecentJobsWithRelations") as CustomerRow[]) ?? []).map(
+      (row) => [row.id, customerFromRow(row)],
+    ),
+  );
+  const vehicles = new Map(
+    ((assertNoError(vehiclesResult, "getRecentJobsWithRelations") as VehicleRow[]) ?? []).map(
+      (row) => [row.id, vehicleFromRow(row)],
+    ),
+  );
+
   return jobs
-    .map((job) => {
-      const normalized = normalizeJobRecord(job);
-      const customer = customers.find(c => c.id === normalized.customer_id) ?? null;
-      const vehicle = vehicles.find(v => v.id === normalized.vehicle_id) ?? null;
-      return { ...normalized, customer, vehicle };
-    })
+    .map((job) => ({
+      ...job,
+      customer: customers.get(job.customer_id) ?? null,
+      vehicle: vehicles.get(job.vehicle_id) ?? null,
+    }))
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
@@ -210,22 +236,22 @@ export async function createJobCard(
     updated_at: now,
   };
 
-  const jobs = await readData<JobCard[]>(FILE_NAME);
-  jobs.push(jobCard);
-  await writeData(FILE_NAME, jobs);
+  const result = await supabase
+    .from("jobs")
+    .insert(jobToRow(jobCard))
+    .select("*")
+    .single();
+  const created = normalizeJobRecord(jobFromRow(assertNoError(result, "createJobCard") as JobRow));
 
-  if (
-    jobCard.status === "Approved" ||
-    jobCard.status === "In Progress"
-  ) {
-    await deductInventoryForLineItems(getJobLineItems(jobCard));
+  if (created.status === "Approved" || created.status === "In Progress") {
+    await deductInventoryForLineItems(getJobLineItems(created));
   }
 
-  if (jobCard.status === "In Progress" && jobCard.bayId) {
-    await occupyBay(jobCard.bayId);
+  if (created.status === "In Progress" && created.bayId) {
+    await occupyBay(created.bayId);
   }
 
-  return jobCard;
+  return created;
 }
 
 /**
@@ -237,11 +263,11 @@ export async function updateJobStatus(
 ): Promise<JobCardWithRelations | null> {
   await simulateLatency();
 
-  const jobs = await readData<JobCard[]>(FILE_NAME);
-  const jobIndex = jobs.findIndex((job) => job.id === jobId);
-  if (jobIndex === -1) return null;
+  const existingResult = await supabase.from("jobs").select("*").eq("id", jobId).limit(1).single();
+  const existingRow = assertNoError(existingResult, "updateJobStatus") as JobRow;
+  if (!existingRow) return null;
 
-  const jobCard = normalizeJobRecord(jobs[jobIndex]);
+  const jobCard = normalizeJobRecord(jobFromRow(existingRow));
   const previousStatus = normalizeJobStatus(jobCard.status);
 
   if (shouldDeductInventory(previousStatus, newStatus)) {
@@ -264,28 +290,59 @@ export async function updateJobStatus(
 
   jobCard.status = newStatus;
   jobCard.updated_at = new Date().toISOString();
-  jobs[jobIndex] = jobCard;
 
-  const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
-  const vehicleIndex = vehicles.findIndex((v) => v.id === jobCard.vehicle_id);
-
+  let vehicle: Vehicle | null = null;
   if (newStatus === "Completed") {
-    if (vehicleIndex !== -1) {
-      const vehicle = vehicles[vehicleIndex];
+    const vehicleResult = await supabase
+      .from("vehicles")
+      .select("*")
+      .eq("id", jobCard.vehicle_id)
+      .limit(1)
+      .single();
+    const vehicleRow = assertNoError(vehicleResult, "updateJobStatus") as VehicleRow;
+    if (vehicleRow) {
       const nextServiceDate = new Date();
       nextServiceDate.setDate(nextServiceDate.getDate() + 180);
-      vehicle.next_service_date = nextServiceDate.toISOString();
-      await writeData(VEHICLES_FILE, vehicles);
+      vehicle = {
+        ...vehicleFromRow(vehicleRow),
+        next_service_date: nextServiceDate.toISOString(),
+      };
+      const updateVehicleResult = await supabase
+        .from("vehicles")
+        .update(vehicleToRow(vehicle))
+        .eq("id", vehicle.id);
+      assertNoError(updateVehicleResult, "updateJobStatus");
     }
+  } else {
+    const vehicleResult = await supabase
+      .from("vehicles")
+      .select("*")
+      .eq("id", jobCard.vehicle_id)
+      .limit(1);
+    const vehicleRow = firstOrNull(assertNoError(vehicleResult, "updateJobStatus") as VehicleRow[]);
+    vehicle = vehicleRow ? vehicleFromRow(vehicleRow) : null;
   }
 
-  await writeData(FILE_NAME, jobs);
+  const updateResult = await supabase
+    .from("jobs")
+    .update(jobToRow(jobCard))
+    .eq("id", jobId)
+    .select("*")
+    .single();
+  const updatedJob = normalizeJobRecord(jobFromRow(assertNoError(updateResult, "updateJobStatus") as JobRow));
 
-  const customers = await readData<Customer[]>(CUSTOMERS_FILE);
-  const customer = customers.find((c) => c.id === jobCard.customer_id) ?? null;
-  const vehicle = vehicleIndex !== -1 ? vehicles[vehicleIndex] : null;
+  const customerResult = await supabase
+    .from("customers")
+    .select("*")
+    .eq("id", updatedJob.customer_id)
+    .limit(1);
+  const customerRow = firstOrNull(assertNoError(customerResult, "updateJobStatus") as CustomerRow[]);
 
-  return { ...jobCard, customer, vehicle };
+  return {
+    ...updatedJob,
+    customer: customerRow ? customerFromRow(customerRow) : null,
+    vehicle,
+  };
 }
 
 export interface UpdateJobAssignmentsInput {
@@ -304,11 +361,11 @@ export async function updateJobAssignments(
 ): Promise<JobCardWithRelations | null> {
   await simulateLatency();
 
-  const jobs = await readData<JobCard[]>(FILE_NAME);
-  const jobIndex = jobs.findIndex((job) => job.id === jobId);
-  if (jobIndex === -1) return null;
+  const existingResult = await supabase.from("jobs").select("*").eq("id", jobId).limit(1).single();
+  const existingRow = assertNoError(existingResult, "updateJobAssignments") as JobRow;
+  if (!existingRow) return null;
 
-  const jobCard = normalizeJobRecord(jobs[jobIndex]);
+  const jobCard = normalizeJobRecord(jobFromRow(existingRow));
   const previousBayId = getJobBayId(jobCard);
   const isInProgress = normalizeJobStatus(jobCard.status) === "In Progress";
 
@@ -330,16 +387,16 @@ export async function updateJobAssignments(
   }
 
   jobCard.updated_at = new Date().toISOString();
-  jobs[jobIndex] = jobCard;
-  await writeData(FILE_NAME, jobs);
 
-  const customers = await readData<Customer[]>(CUSTOMERS_FILE);
-  const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
-  const customer = customers.find((c) => c.id === jobCard.customer_id) ?? null;
-  const vehicle =
-    vehicles.find((v) => v.id === jobCard.vehicle_id) ?? null;
+  const updateResult = await supabase
+    .from("jobs")
+    .update(jobToRow(jobCard))
+    .eq("id", jobId)
+    .select("*")
+    .single();
+  const updatedJob = normalizeJobRecord(jobFromRow(assertNoError(updateResult, "updateJobAssignments") as JobRow));
 
-  return { ...jobCard, customer, vehicle };
+  return joinJobRelations(updatedJob);
 }
 
 export interface AddJobLineItemInput {
@@ -379,11 +436,11 @@ export async function appendLineItemToJob(
 ): Promise<JobCardWithRelations | null> {
   await simulateLatency();
 
-  const jobs = await readData<JobCard[]>(FILE_NAME);
-  const jobIndex = jobs.findIndex((job) => job.id === jobId);
-  if (jobIndex === -1) return null;
+  const existingResult = await supabase.from("jobs").select("*").eq("id", jobId).limit(1).single();
+  const existingRow = assertNoError(existingResult, "appendLineItemToJob") as JobRow;
+  if (!existingRow) return null;
 
-  const jobCard = normalizeJobRecord(jobs[jobIndex]);
+  const jobCard = normalizeJobRecord(jobFromRow(existingRow));
   const quantity = input.quantity || 1;
   const unitPrice = input.unitPrice;
   const newLineItem: JobCardLineItem = {
@@ -403,16 +460,15 @@ export async function appendLineItemToJob(
   jobCard.total_amount = totals.total_amount;
   jobCard.updated_at = new Date().toISOString();
 
-  jobs[jobIndex] = jobCard;
-  await writeData(FILE_NAME, jobs);
+  const updateResult = await supabase
+    .from("jobs")
+    .update(jobToRow(jobCard))
+    .eq("id", jobId)
+    .select("*")
+    .single();
+  const updatedJob = normalizeJobRecord(jobFromRow(assertNoError(updateResult, "appendLineItemToJob") as JobRow));
 
-  const customers = await readData<Customer[]>(CUSTOMERS_FILE);
-  const vehicles = await readData<Vehicle[]>(VEHICLES_FILE);
-  const customer = customers.find((c) => c.id === jobCard.customer_id) ?? null;
-  const vehicle =
-    vehicles.find((v) => v.id === jobCard.vehicle_id) ?? null;
-
-  return { ...jobCard, customer, vehicle };
+  return joinJobRelations(updatedJob);
 }
 
 export type Timeframe = "today" | "week" | "month" | "all";
@@ -450,7 +506,7 @@ function isWithinTimeframe(dateStr: string, timeframe: Timeframe): boolean {
 export async function getDashboardMetrics(timeframe: Timeframe = "today") {
   await simulateLatency();
 
-  const jobs = await readData<JobCard[]>(FILE_NAME);
+  const jobs = await fetchJobs();
 
   let revenue = 0;
   let pendingJobs = 0;
@@ -490,7 +546,7 @@ export interface ServiceAnalytics {
 export async function getServiceAnalytics(timeframe: Timeframe = "today"): Promise<ServiceAnalytics> {
   await simulateLatency();
 
-  const jobs = await readData<JobCard[]>(FILE_NAME);
+  const jobs = await fetchJobs();
 
   const validJobs = jobs.filter(
     (job) => {
@@ -553,7 +609,7 @@ export interface RevenueTrendData {
 
 export async function getRevenueTrend(timeframe: Timeframe = "week"): Promise<RevenueTrendData[]> {
   await simulateLatency();
-  const jobs = await readData<JobCard[]>(FILE_NAME);
+  const jobs = await fetchJobs();
 
   const validJobs = jobs.filter(
     (job) => {
@@ -620,19 +676,15 @@ export async function getRevenueTrend(timeframe: Timeframe = "week"): Promise<Re
 export async function updateJobQueueOrder(jobIds: string[]): Promise<void> {
   await simulateLatency();
 
-  const jobs = await readData<JobCard[]>(FILE_NAME);
-  let modified = false;
-
-  jobIds.forEach((id, index) => {
-    const jobIndex = jobs.findIndex(j => j.id === id);
-    if (jobIndex !== -1 && jobs[jobIndex].queue_index !== index) {
-      jobs[jobIndex].queue_index = index;
-      jobs[jobIndex].updated_at = new Date().toISOString();
-      modified = true;
-    }
-  });
-
-  if (modified) {
-    await writeData(FILE_NAME, jobs);
-  }
+  const now = new Date().toISOString();
+  await Promise.all(
+    jobIds.map(async (id, index) => {
+      const result = await supabase
+        .from("jobs")
+        .update({ queue_index: index, updated_at: now })
+        .eq("id", id)
+        .neq("queue_index", index);
+      assertNoError(result, "updateJobQueueOrder");
+    }),
+  );
 }

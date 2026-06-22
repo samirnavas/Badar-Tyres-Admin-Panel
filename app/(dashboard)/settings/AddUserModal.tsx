@@ -21,6 +21,12 @@ const USER_ROLES = [
 
 const userSchema = z.object({
   name: z.string().min(1, "Name is required"),
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .max(32, "Username must be at most 32 characters")
+    .regex(/^[a-zA-Z0-9._-]+$/, "Use letters, numbers, dots, dashes, or underscores"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(USER_ROLES),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional().or(z.literal("")),
@@ -41,6 +47,8 @@ export function AddUserModal({ open, onClose }: { open: boolean; onClose: () => 
     resolver: zodResolver(userSchema),
     defaultValues: {
       name: "",
+      username: "",
+      password: "",
       role: "Technician",
       email: "",
       phone: "",
@@ -54,6 +62,8 @@ export function AddUserModal({ open, onClose }: { open: boolean; onClose: () => 
     try {
       await createUser({
         name: values.name,
+        username: values.username,
+        password: values.password,
         role: values.role,
         email: values.email || "",
         phone: values.phone || "",
@@ -63,7 +73,7 @@ export function AddUserModal({ open, onClose }: { open: boolean; onClose: () => 
       onClose();
     } catch (err) {
       console.error(err);
-      alert("Failed to create user.");
+      alert(err instanceof Error ? err.message : "Failed to create user.");
     } finally {
       setIsSubmitting(false);
     }
@@ -107,6 +117,48 @@ export function AddUserModal({ open, onClose }: { open: boolean; onClose: () => 
                 placeholder="e.g. John Doe"
               />
               {errors.name && <p className="mt-1 text-xs text-theme-accent">{errors.name.message}</p>}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  Username *
+                </label>
+                <input
+                  {...register("username")}
+                  autoComplete="username"
+                  className={cn(
+                    "w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1",
+                    errors.username
+                      ? "border-theme-accent focus:border-theme-accent focus:ring-theme-accent"
+                      : "border-gray-200 focus:border-theme-accent focus:ring-theme-accent"
+                  )}
+                  placeholder="e.g. jsmith"
+                />
+                {errors.username && (
+                  <p className="mt-1 text-xs text-theme-accent">{errors.username.message}</p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  Password *
+                </label>
+                <input
+                  {...register("password")}
+                  type="password"
+                  autoComplete="new-password"
+                  className={cn(
+                    "w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1",
+                    errors.password
+                      ? "border-theme-accent focus:border-theme-accent focus:ring-theme-accent"
+                      : "border-gray-200 focus:border-theme-accent focus:ring-theme-accent"
+                  )}
+                  placeholder="Min. 6 characters"
+                />
+                {errors.password && (
+                  <p className="mt-1 text-xs text-theme-accent">{errors.password.message}</p>
+                )}
+              </div>
             </div>
 
             <div>

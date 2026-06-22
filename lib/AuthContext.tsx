@@ -41,9 +41,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
   const refreshPermissions = useCallback(async () => {
-    const data = await getPermissions();
-    setPermissions(data);
-    setPermissionsLoaded(true);
+    try {
+      const data = await getPermissions();
+      setPermissions(data);
+    } catch {
+      setPermissions({ Admin: ["*"] });
+    } finally {
+      setPermissionsLoaded(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -68,7 +73,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hasPermission = useCallback(
     (pathname: string) => {
-      if (!state.user || !permissions) return false;
+      if (!state.user) return false;
+      if (state.user.role === "Admin") return true;
+      if (!permissions) return false;
       return hasRoutePermission(
         state.user.role as UserRole,
         pathname,

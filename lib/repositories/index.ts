@@ -59,8 +59,7 @@ export { getSettings, updateSettings } from "./settings_repository";
 export { getPermissions, updatePermissions } from "./permission_repository";
 export {
   getManufacturers,
-  createManufacturer,
-  deleteManufacturer,
+  getManufacturerIdByName,
 } from "./manufacturer_repository";
 export {
   getInspections,

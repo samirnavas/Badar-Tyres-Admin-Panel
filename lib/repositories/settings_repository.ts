@@ -8,6 +8,7 @@ const FILE_NAME = "settings.json";
 
 /**
  * Returns the shop's global settings.
+ * Note: no `settings` table exists in Supabase yet — still backed by local JSON.
  */
 export async function getSettings(): Promise<ShopSettings> {
   await simulateLatency();

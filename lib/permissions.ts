@@ -32,7 +32,9 @@ export const ROUTE_PERMISSION_PREFIX: Record<string, string> = {
 
 export function resolvePermissionPrefix(pathname: string): string {
   if (pathname.startsWith("action:")) return pathname;
-  const base = "/" + pathname.split("/").filter(Boolean)[0];
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length === 0) return "/dashboard";
+  const base = `/${segments[0]}`;
   return ROUTE_PERMISSION_PREFIX[base] ?? base;
 }
 
@@ -41,8 +43,10 @@ export function hasRoutePermission(
   pathname: string,
   permissions: Record<string, string[]>,
 ): boolean {
+  if (role === "Admin") return true;
+
   const prefixes = permissions[role];
-  if (!prefixes) return false;
+  if (!prefixes?.length) return false;
   if (prefixes.includes("*")) return true;
 
   const permissionPrefix = resolvePermissionPrefix(pathname);

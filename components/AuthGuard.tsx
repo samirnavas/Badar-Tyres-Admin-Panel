@@ -3,11 +3,11 @@
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
-import { Loader2, ShieldX } from "lucide-react";
+import { Loader2, LogOut, ShieldX } from "lucide-react";
 import type { UserRole } from "@/lib/models/User";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, isInitialized, hasPermission, permissionsLoaded } = useAuth();
+  const { user, isInitialized, hasPermission, permissionsLoaded, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -40,6 +40,17 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             Your role ({user.role as UserRole}) is not permitted to view this
             page. Contact an administrator if you need access.
           </p>
+          <button
+            type="button"
+            onClick={() => {
+              logout();
+              router.replace("/login");
+            }}
+            className="mt-6 inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-red-600 shadow-sm transition-colors hover:bg-gray-50"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
         </div>
       </div>
     );

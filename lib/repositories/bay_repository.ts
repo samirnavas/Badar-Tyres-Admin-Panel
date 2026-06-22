@@ -1,63 +1,68 @@
 "use server";
 
 import type { Bay, BayStatus } from "../models/Bay";
-import { readData, writeData } from "../db";
+import { assertNoError, firstOrNull } from "../database/helpers";
+import { bayFromRow, bayToRow, type BayRow } from "../database/mappers";
 import { generateId } from "../generateId";
+import { supabase } from "../supabase";
 import { simulateLatency } from "./delay";
-
-const FILE_NAME = "bays.json";
 
 class BayRepository {
   async getBays(): Promise<Bay[]> {
     await simulateLatency();
-    return readData<Bay[]>(FILE_NAME);
+    const result = await supabase.from("bays").select("*").order("name");
+    const rows = assertNoError(result, "getBays") as BayRow[];
+    return (rows ?? []).map(bayFromRow);
   }
 
   async getBayById(id: string): Promise<Bay | null> {
     await simulateLatency();
-    const bays = await readData<Bay[]>(FILE_NAME);
-    return bays.find((bay) => bay.id === id) ?? null;
+    const result = await supabase.from("bays").select("*").eq("id", id).limit(1);
+    const row = firstOrNull(assertNoError(result, "getBayById") as BayRow[]);
+    return row ? bayFromRow(row) : null;
   }
 
   async getOpenBays(): Promise<Bay[]> {
     await simulateLatency();
-    const bays = await readData<Bay[]>(FILE_NAME);
-    return bays.filter((bay) => bay.status === "Open");
+    const result = await supabase.from("bays").select("*").eq("status", "Open").order("name");
+    const rows = assertNoError(result, "getOpenBays") as BayRow[];
+    return (rows ?? []).map(bayFromRow);
   }
 
   async createBay(data: Omit<Bay, "id">): Promise<Bay> {
     await simulateLatency();
 
     const bay: Bay = { ...data, id: generateId() };
-    const bays = await readData<Bay[]>(FILE_NAME);
-    bays.push(bay);
-    await writeData(FILE_NAME, bays);
-
-    return bay;
+    const result = await supabase
+      .from("bays")
+      .insert(bayToRow(bay))
+      .select("*")
+      .single();
+    return bayFromRow(assertNoError(result, "createBay") as BayRow);
   }
 
   async updateBay(id: string, data: Partial<Omit<Bay, "id">>): Promise<Bay> {
     await simulateLatency();
 
-    const bays = await readData<Bay[]>(FILE_NAME);
-    const index = bays.findIndex((bay) => bay.id === id);
-    if (index === -1) {
+    const existing = await this.getBayById(id);
+    if (!existing) {
       throw new Error("Bay not found");
     }
 
-    const updatedBay = { ...bays[index], ...data };
-    bays[index] = updatedBay;
-    await writeData(FILE_NAME, bays);
-
-    return updatedBay;
+    const updatedBay = { ...existing, ...data };
+    const result = await supabase
+      .from("bays")
+      .update(bayToRow(updatedBay))
+      .eq("id", id)
+      .select("*")
+      .single();
+    return bayFromRow(assertNoError(result, "updateBay") as BayRow);
   }
 
   async deleteBay(id: string): Promise<void> {
     await simulateLatency();
-
-    const bays = await readData<Bay[]>(FILE_NAME);
-    const updated = bays.filter((bay) => bay.id !== id);
-    await writeData(FILE_NAME, updated);
+    const result = await supabase.from("bays").delete().eq("id", id);
+    assertNoError(result, "deleteBay");
   }
 
   async setBayStatus(id: string, status: BayStatus): Promise<Bay> {

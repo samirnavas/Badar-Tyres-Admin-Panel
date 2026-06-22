@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -47,6 +47,7 @@ export function VehicleFormModal({
     handleSubmit,
     reset,
     control,
+    setValue,
     formState: { errors },
   } = useForm<VehicleFormValues>({
     resolver: zodResolver(vehicleSchema),
@@ -136,12 +137,20 @@ export function VehicleFormModal({
   });
 
   const manufacturersQuery = useQuery({
-    queryKey: ["manufacturers"],
-    queryFn: getManufacturers,
+    queryKey: ["manufacturers", vehicleType],
+    queryFn: () => getManufacturers(vehicleType as VehicleType),
+    enabled: !!vehicleType,
   });
 
-  const manufacturerOptions =
-    manufacturersQuery.data?.map((m) => ({ label: m.name, value: m.name })) ?? [];
+  const manufacturerOptions = useMemo(() => {
+    const options =
+      manufacturersQuery.data?.map((m) => ({ label: m.name, value: m.name })) ?? [];
+    const current = vehicleToEdit?.manufacturer;
+    if (current && !options.some((option) => option.value === current)) {
+      return [{ label: current, value: current }, ...options];
+    }
+    return options;
+  }, [manufacturersQuery.data, vehicleToEdit?.manufacturer]);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -221,7 +230,10 @@ export function VehicleFormModal({
                             { value: "Others", label: "Others" },
                           ]}
                           value={field.value}
-                          onChange={field.onChange}
+                          onChange={(value) => {
+                            field.onChange(value);
+                            setValue("manufacturer", "");
+                          }}
                           className={inputClass(!!errors.type)}
                           placeholder="Select vehicle type..."
                         />
@@ -239,9 +251,11 @@ export function VehicleFormModal({
                       value={field.value ?? ""}
                       onChange={field.onChange}
                       placeholder="Select manufacturer..."
-                      disabled={manufacturersQuery.isLoading}
+                      disabled={manufacturersQuery.isLoading || !vehicleType}
                       className={inputClass(!!errors.manufacturer)}
-                      emptyMessage="No manufacturers"
+                      emptyMessage={
+                        vehicleType ? "No manufacturers for this vehicle type" : "Select vehicle type first"
+                      }
                       autoFocus
                     />
                   )}

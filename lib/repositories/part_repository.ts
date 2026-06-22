@@ -1,22 +1,25 @@
 "use server";
 
 import type { Part, PartInput } from "../models/Part";
-import { readData, writeData } from "../db";
+import { assertNoError, firstOrNull } from "../database/helpers";
+import { partFromRow, partToRow, type PartRow } from "../database/mappers";
 import { generateId } from "../generateId";
+import { supabase } from "../supabase";
 import { simulateLatency } from "./delay";
-
-const FILE_NAME = "parts.json";
 
 class PartRepository {
   async getParts(): Promise<Part[]> {
     await simulateLatency();
-    return readData<Part[]>(FILE_NAME);
+    const result = await supabase.from("parts").select("*").order("name");
+    const rows = assertNoError(result, "getParts") as PartRow[];
+    return (rows ?? []).map(partFromRow);
   }
 
   async getPartById(id: string): Promise<Part | null> {
     await simulateLatency();
-    const parts = await readData<Part[]>(FILE_NAME);
-    return parts.find((part) => part.id === id) ?? null;
+    const result = await supabase.from("parts").select("*").eq("id", id).limit(1);
+    const row = firstOrNull(assertNoError(result, "getPartById") as PartRow[]);
+    return row ? partFromRow(row) : null;
   }
 
   async createPart(data: PartInput): Promise<Part> {
@@ -30,45 +33,46 @@ class PartRepository {
       updatedAt: now,
     };
 
-    const parts = await readData<Part[]>(FILE_NAME);
-    parts.unshift(part);
-    await writeData(FILE_NAME, parts);
-
-    return part;
+    const result = await supabase
+      .from("parts")
+      .insert(partToRow(part))
+      .select("*")
+      .single();
+    return partFromRow(assertNoError(result, "createPart") as PartRow);
   }
 
   async updatePart(id: string, data: Partial<PartInput>): Promise<Part> {
     await simulateLatency();
 
-    const parts = await readData<Part[]>(FILE_NAME);
-    const index = parts.findIndex((part) => part.id === id);
-    if (index === -1) {
+    const existing = await this.getPartById(id);
+    if (!existing) {
       throw new Error("Part not found");
     }
 
     const updatedPart: Part = {
-      ...parts[index],
+      ...existing,
       ...data,
       updatedAt: new Date().toISOString(),
     };
 
-    parts[index] = updatedPart;
-    await writeData(FILE_NAME, parts);
-
-    return updatedPart;
+    const result = await supabase
+      .from("parts")
+      .update(partToRow(updatedPart))
+      .eq("id", id)
+      .select("*")
+      .single();
+    return partFromRow(assertNoError(result, "updatePart") as PartRow);
   }
 
   async deletePart(id: string): Promise<void> {
     await simulateLatency();
-
-    const parts = await readData<Part[]>(FILE_NAME);
-    const updated = parts.filter((part) => part.id !== id);
-    await writeData(FILE_NAME, updated);
+    const result = await supabase.from("parts").delete().eq("id", id);
+    assertNoError(result, "deletePart");
   }
 
   async getLowStockParts(): Promise<Part[]> {
     await simulateLatency();
-    const parts = await readData<Part[]>(FILE_NAME);
+    const parts = await this.getParts();
     return parts.filter((part) => part.stockLevel <= part.minStockThreshold);
   }
 }

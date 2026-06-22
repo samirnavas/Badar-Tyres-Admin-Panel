@@ -1,18 +1,41 @@
 "use server";
 
+import type { Customer } from "../models/Customer";
 import type { Vehicle } from "../models/Vehicle";
-import { readData, writeData } from "../db";
+import type { JobCard } from "../models/JobCard";
+import { assertNoError, firstOrNull } from "../database/helpers";
+import {
+  customerFromRow,
+  jobFromRow,
+  vehicleFromRow,
+  vehicleToRow,
+  type CustomerRow,
+  type JobRow,
+  type VehicleRow,
+} from "../database/mappers";
 import { generateId } from "../generateId";
+import { supabase } from "../supabase";
 import { simulateLatency } from "./delay";
+import { getManufacturerIdByName } from "./manufacturer_repository";
 
-const FILE_NAME = "vehicles.json";
+const VEHICLE_SELECT = "*, manufacturers!make_id(name)";
+
+async function resolveMakeId(manufacturer: string): Promise<string> {
+  const makeId = await getManufacturerIdByName(manufacturer);
+  if (!makeId) {
+    throw new Error(`Unknown manufacturer: ${manufacturer}`);
+  }
+  return makeId;
+}
 
 /**
  * Returns all vehicles.
  */
 export async function getVehicles(): Promise<Vehicle[]> {
   await simulateLatency();
-  return readData<Vehicle[]>(FILE_NAME);
+  const result = await supabase.from("vehicles").select(VEHICLE_SELECT).order("plate_number");
+  const rows = assertNoError(result, "getVehicles") as VehicleRow[];
+  return (rows ?? []).map(vehicleFromRow);
 }
 
 /**
@@ -20,8 +43,9 @@ export async function getVehicles(): Promise<Vehicle[]> {
  */
 export async function getVehicleById(id: string): Promise<Vehicle | null> {
   await simulateLatency();
-  const vehicles = await readData<Vehicle[]>(FILE_NAME);
-  return vehicles.find((vehicle) => vehicle.id === id) ?? null;
+  const result = await supabase.from("vehicles").select(VEHICLE_SELECT).eq("id", id).limit(1);
+  const row = firstOrNull(assertNoError(result, "getVehicleById") as VehicleRow[]);
+  return row ? vehicleFromRow(row) : null;
 }
 
 /**
@@ -32,12 +56,17 @@ export async function getVehiclesByCustomerId(
   customerId: string,
 ): Promise<Vehicle[]> {
   await simulateLatency();
-  const vehicles = await readData<Vehicle[]>(FILE_NAME);
-  return vehicles.filter((vehicle) => vehicle.customer_id === customerId);
+  const result = await supabase
+    .from("vehicles")
+    .select(VEHICLE_SELECT)
+    .eq("customer_id", customerId)
+    .order("plate_number");
+  const rows = assertNoError(result, "getVehiclesByCustomerId") as VehicleRow[];
+  return (rows ?? []).map(vehicleFromRow);
 }
 
 /**
- * Creates a new vehicle, persists it to the JSON file, and returns it.
+ * Creates a new vehicle, persists it to the database, and returns it.
  */
 export async function createVehicle(
   data: Omit<Vehicle, "id">,
@@ -45,11 +74,13 @@ export async function createVehicle(
   await simulateLatency();
 
   const vehicle: Vehicle = { ...data, id: generateId() };
-  const vehicles = await readData<Vehicle[]>(FILE_NAME);
-  vehicles.push(vehicle);
-  await writeData(FILE_NAME, vehicles);
-
-  return vehicle;
+  const makeId = await resolveMakeId(vehicle.manufacturer);
+  const result = await supabase
+    .from("vehicles")
+    .insert(vehicleToRow(vehicle, undefined, makeId))
+    .select(VEHICLE_SELECT)
+    .single();
+  return vehicleFromRow(assertNoError(result, "createVehicle") as VehicleRow);
 }
 
 /**
@@ -61,21 +92,21 @@ export async function updateVehicle(
 ): Promise<Vehicle> {
   await simulateLatency();
 
-  const vehicles = await readData<Vehicle[]>(FILE_NAME);
-  const index = vehicles.findIndex((v) => v.id === id);
-  if (index === -1) {
+  const existing = await getVehicleById(id);
+  if (!existing) {
     throw new Error("Vehicle not found");
   }
 
-  const updatedVehicle = { ...vehicles[index], ...data };
-  vehicles[index] = updatedVehicle;
-  await writeData(FILE_NAME, vehicles);
-
-  return updatedVehicle;
+  const updatedVehicle = { ...existing, ...data };
+  const makeId = await resolveMakeId(updatedVehicle.manufacturer);
+  const result = await supabase
+    .from("vehicles")
+    .update(vehicleToRow(updatedVehicle, undefined, makeId))
+    .eq("id", id)
+    .select(VEHICLE_SELECT)
+    .single();
+  return vehicleFromRow(assertNoError(result, "updateVehicle") as VehicleRow);
 }
-
-import type { Customer } from "../models/Customer";
-import type { JobCard } from "../models/JobCard";
 
 export interface Vehicle360 {
   vehicle: Vehicle;
@@ -85,16 +116,19 @@ export interface Vehicle360 {
 
 export async function getVehicle360(vehicleId: string): Promise<Vehicle360 | null> {
   await simulateLatency();
-  const vehicles = await readData<Vehicle[]>(FILE_NAME);
-  const vehicle = vehicles.find((v) => v.id === vehicleId);
+  const vehicle = await getVehicleById(vehicleId);
   if (!vehicle) return null;
 
-  const customers = await readData<Customer[]>("customers.json");
-  const customer = customers.find((c) => c.id === vehicle.customer_id) || null;
+  const [customerResult, jobsResult] = await Promise.all([
+    supabase.from("customers").select("*").eq("id", vehicle.customer_id).limit(1),
+    supabase.from("jobs").select("*").eq("vehicle_id", vehicleId),
+  ]);
 
-  const allJobs = await readData<JobCard[]>("jobs.json");
-  const jobs = allJobs
-    .filter((j) => j.vehicle_id === vehicleId)
+  const customerRow = firstOrNull(assertNoError(customerResult, "getVehicle360") as CustomerRow[]);
+  const customer = customerRow ? customerFromRow(customerRow) : null;
+
+  const jobs = (assertNoError(jobsResult, "getVehicle360") as JobRow[])
+    .map((row) => jobFromRow(row))
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   return { vehicle, customer, jobs };
@@ -114,8 +148,18 @@ export interface NotificationItem {
 
 export async function getExpiringNotifications(daysThreshold = 30): Promise<NotificationItem[]> {
   await simulateLatency();
-  const vehicles = await readData<Vehicle[]>(FILE_NAME);
-  const customers = await readData<Customer[]>("customers.json");
+
+  const [vehiclesResult, customersResult] = await Promise.all([
+    supabase.from("vehicles").select(VEHICLE_SELECT),
+    supabase.from("customers").select("*"),
+  ]);
+
+  const vehicles = (assertNoError(vehiclesResult, "getExpiringNotifications") as VehicleRow[]).map(
+    vehicleFromRow,
+  );
+  const customers = (assertNoError(customersResult, "getExpiringNotifications") as CustomerRow[]).map(
+    customerFromRow,
+  );
 
   const notifications: NotificationItem[] = [];
 

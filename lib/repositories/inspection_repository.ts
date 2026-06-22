@@ -4,33 +4,40 @@ import type {
   InspectionReport,
   InspectionReportInput,
 } from "../models/Inspection";
-import { readData, writeData } from "../db";
+import { assertNoError, firstOrNull } from "../database/helpers";
+import {
+  inspectionFromRow,
+  inspectionToRow,
+  type InspectionRow,
+} from "../database/mappers";
 import { generateId } from "../generateId";
+import { supabase } from "../supabase";
 import { simulateLatency } from "./delay";
-
-const FILE_NAME = "inspections.json";
 
 class InspectionRepository {
   async getInspections(): Promise<InspectionReport[]> {
     await simulateLatency();
-    return readData<InspectionReport[]>(FILE_NAME);
+    const result = await supabase.from("inspections").select("*").order("created_at", { ascending: false });
+    const rows = assertNoError(result, "getInspections") as InspectionRow[];
+    return (rows ?? []).map(inspectionFromRow);
   }
 
   async getInspectionById(id: string): Promise<InspectionReport | null> {
     await simulateLatency();
-    const inspections = await readData<InspectionReport[]>(FILE_NAME);
-    return inspections.find((report) => report.id === id) ?? null;
+    const result = await supabase.from("inspections").select("*").eq("id", id).limit(1);
+    const row = firstOrNull(assertNoError(result, "getInspectionById") as InspectionRow[]);
+    return row ? inspectionFromRow(row) : null;
   }
 
   async getInspectionsByJobId(jobId: string): Promise<InspectionReport[]> {
     await simulateLatency();
-    const inspections = await readData<InspectionReport[]>(FILE_NAME);
-    return inspections
-      .filter((report) => report.jobId === jobId)
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+    const result = await supabase
+      .from("inspections")
+      .select("*")
+      .eq("job_id", jobId)
+      .order("created_at", { ascending: false });
+    const rows = assertNoError(result, "getInspectionsByJobId") as InspectionRow[];
+    return (rows ?? []).map(inspectionFromRow);
   }
 
   async createInspection(data: InspectionReportInput): Promise<InspectionReport> {
@@ -42,11 +49,12 @@ class InspectionRepository {
       createdAt: new Date().toISOString(),
     };
 
-    const inspections = await readData<InspectionReport[]>(FILE_NAME);
-    inspections.unshift(report);
-    await writeData(FILE_NAME, inspections);
-
-    return report;
+    const result = await supabase
+      .from("inspections")
+      .insert(inspectionToRow(report))
+      .select("*")
+      .single();
+    return inspectionFromRow(assertNoError(result, "createInspection") as InspectionRow);
   }
 
   async updateInspection(
@@ -55,28 +63,29 @@ class InspectionRepository {
   ): Promise<InspectionReport> {
     await simulateLatency();
 
-    const inspections = await readData<InspectionReport[]>(FILE_NAME);
-    const index = inspections.findIndex((report) => report.id === id);
-    if (index === -1) {
+    const existing = await this.getInspectionById(id);
+    if (!existing) {
       throw new Error("Inspection report not found");
     }
 
     const updatedReport: InspectionReport = {
-      ...inspections[index],
+      ...existing,
       ...data,
     };
-    inspections[index] = updatedReport;
-    await writeData(FILE_NAME, inspections);
 
-    return updatedReport;
+    const result = await supabase
+      .from("inspections")
+      .update(inspectionToRow(updatedReport))
+      .eq("id", id)
+      .select("*")
+      .single();
+    return inspectionFromRow(assertNoError(result, "updateInspection") as InspectionRow);
   }
 
   async deleteInspection(id: string): Promise<void> {
     await simulateLatency();
-
-    const inspections = await readData<InspectionReport[]>(FILE_NAME);
-    const updated = inspections.filter((report) => report.id !== id);
-    await writeData(FILE_NAME, updated);
+    const result = await supabase.from("inspections").delete().eq("id", id);
+    assertNoError(result, "deleteInspection");
   }
 }
 

@@ -1,17 +1,19 @@
 "use server";
 
 import type { Service } from "../models/Service";
-import { readData, writeData } from "../db";
+import { assertNoError, firstOrNull } from "../database/helpers";
+import { serviceFromRow, serviceToRow, type ServiceRow } from "../database/mappers";
+import { supabase } from "../supabase";
 import { simulateLatency } from "./delay";
-
-const FILE_NAME = "services.json";
 
 /**
  * Returns all services in the catalog.
  */
 export async function getServices(): Promise<Service[]> {
   await simulateLatency();
-  return readData<Service[]>(FILE_NAME);
+  const result = await supabase.from("services").select("*").order("name");
+  const rows = assertNoError(result, "getServices") as ServiceRow[];
+  return (rows ?? []).map(serviceFromRow);
 }
 
 /**
@@ -19,14 +21,15 @@ export async function getServices(): Promise<Service[]> {
  */
 export async function getServiceById(id: string): Promise<Service | null> {
   await simulateLatency();
-  const services = await readData<Service[]>(FILE_NAME);
-  return services.find((service) => service.id === id) ?? null;
+  const result = await supabase.from("services").select("*").eq("id", id).limit(1);
+  const row = firstOrNull(assertNoError(result, "getServiceById") as ServiceRow[]);
+  return row ? serviceFromRow(row) : null;
 }
 
 export type CreateServiceInput = Omit<Service, "id">;
 
 /**
- * Creates a new service and adds it to the JSON database.
+ * Creates a new service and adds it to the database.
  */
 export async function createService(input: CreateServiceInput): Promise<Service> {
   await simulateLatency();
@@ -36,26 +39,31 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     id: `srv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
   };
 
-  const services = await readData<Service[]>(FILE_NAME);
-  services.unshift(newService);
-  await writeData(FILE_NAME, services);
-
-  return newService;
+  const result = await supabase
+    .from("services")
+    .insert(serviceToRow(newService))
+    .select("*")
+    .single();
+  return serviceFromRow(assertNoError(result, "createService") as ServiceRow);
 }
+
 export async function updateService(id: string, data: Partial<Service>): Promise<Service | null> {
   await simulateLatency();
-  const services = await readData<Service[]>(FILE_NAME);
-  const index = services.findIndex((s) => s.id === id);
-  if (index === -1) return null;
+  const existing = await getServiceById(id);
+  if (!existing) return null;
 
-  services[index] = { ...services[index], ...data };
-  await writeData(FILE_NAME, services);
-  return services[index];
+  const updated = { ...existing, ...data };
+  const result = await supabase
+    .from("services")
+    .update(serviceToRow(updated))
+    .eq("id", id)
+    .select("*")
+    .single();
+  return serviceFromRow(assertNoError(result, "updateService") as ServiceRow);
 }
 
 export async function deleteService(id: string): Promise<void> {
   await simulateLatency();
-  const services = await readData<Service[]>(FILE_NAME);
-  const updated = services.filter((s) => s.id !== id);
-  await writeData(FILE_NAME, updated);
+  const result = await supabase.from("services").delete().eq("id", id);
+  assertNoError(result, "deleteService");
 }

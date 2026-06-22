@@ -10,7 +10,11 @@ export async function readData<T>(filename: string): Promise<T> {
   const filePath = path.join(DATA_DIR, filename);
   try {
     const data = await fs.readFile(filePath, "utf-8");
-    return JSON.parse(data) as T;
+    const withoutComments = data
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("//"))
+      .join("\n");
+    return JSON.parse(withoutComments) as T;
   } catch (error: any) {
     if (error.code === "ENOENT") {
       // If the file doesn't exist, we assume it's an array for all files except settings

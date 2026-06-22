@@ -77,10 +77,6 @@ function CreateJobForm() {
     queryKey: ["technician-users"],
     queryFn: getTechnicians,
   });
-  const manufacturersQuery = useQuery({
-    queryKey: ["manufacturers-list"],
-    queryFn: getManufacturers,
-  });
   const settingsQuery = useQuery({
     queryKey: ["shop-settings"],
     queryFn: getSettings,
@@ -164,6 +160,12 @@ function CreateJobForm() {
   const vehicleType = useWatch({ control, name: "vehicleType" });
   const isAddingNewVehicle = useWatch({ control, name: "is_new_vehicle" });
   const watchedLineItems = useWatch({ control, name: "lineItems" }) ?? [];
+
+  const manufacturersQuery = useQuery({
+    queryKey: ["manufacturers-list", vehicleType],
+    queryFn: () => getManufacturers(vehicleType as VehicleType),
+    enabled: !!vehicleType && isAddingNewVehicle,
+  });
 
   // Holds the search term for the inline "quick add customer" modal; null when closed.
   const [quickAddName, setQuickAddName] = useState<string | null>(null);
@@ -278,8 +280,9 @@ function CreateJobForm() {
   );
 
   const manufacturerOptions: ComboboxOption[] = useMemo(() => {
+    if (!vehicleType) return [];
     return (manufacturersQuery.data ?? []).map((m) => ({ value: m.name, label: m.name }));
-  }, [manufacturersQuery.data]);
+  }, [manufacturersQuery.data, vehicleType]);
 
   const lineItemOptions: ComboboxOption[] = useMemo(() => {
     const serviceOptions = (servicesQuery.data ?? []).map((service) => ({
@@ -617,9 +620,13 @@ function CreateJobForm() {
                             value={field.value ?? ""}
                             onChange={field.onChange}
                             placeholder="Select manufacturer..."
-                            disabled={manufacturersQuery.isLoading}
+                            disabled={manufacturersQuery.isLoading || !vehicleType}
                             className={inputClass(!!errors.manufacturer)}
-                            emptyMessage="No manufacturers"
+                            emptyMessage={
+                              vehicleType
+                                ? "No manufacturers for this vehicle type"
+                                : "Select vehicle type first"
+                            }
                           />
                         )}
                       />

@@ -27,7 +27,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, user, isInitialized } = useAuth();
+  const { login, user, isInitialized, refreshPermissions } = useAuth();
   const [errorMsg, setErrorMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [credentialsReady, setCredentialsReady] = useState(false);
@@ -68,13 +68,14 @@ export default function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: ({ username, password }: LoginForm) =>
       verifyLogin(username, password),
-    onSuccess: (data, variables) => {
+    onSuccess: async (data, variables) => {
       saveLoginCredentials(
         variables.username,
         variables.password,
         variables.rememberMe,
       );
       login(data.token, normalizeAuthUser(data.user), variables.rememberMe);
+      await refreshPermissions();
       toast.success("Login successful");
       router.replace("/dashboard");
     },

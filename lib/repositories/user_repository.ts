@@ -1,17 +1,81 @@
 "use server";
 
 import type { User } from "../models/User";
-import { readData, writeData } from "../db";
+import { assertNoError, firstOrNull } from "../database/helpers";
+import { userFromRow, userToRow, type UserRow } from "../database/mappers";
+import { getSupabaseAdmin } from "../supabase-admin";
+import { getSupabaseAuthClient, supabase } from "../supabase";
 import { simulateLatency } from "./delay";
 
-const FILE_NAME = "users.json";
+const USER_COLUMNS = "id, name, email, role, created_at, username, phone";
+
+/** Required to create a user who can log in. */
+export type CreateUserInput = Omit<User, "id"> & {
+  username: string;
+  password: string;
+};
+
+function normalizeUsername(username: string): string {
+  return username.trim().toLowerCase();
+}
+
+function resolveEmailForLegacyLogin(
+  username: string,
+  profiles: UserRow[],
+): UserRow | null {
+  const normalized = normalizeUsername(username);
+  if (!normalized) return null;
+
+  const byUsername = profiles.find(
+    (profile) => profile.username?.toLowerCase() === normalized,
+  );
+  if (byUsername) return byUsername;
+
+  if (normalized.includes("@")) {
+    return (
+      profiles.find(
+        (profile) => profile.email.toLowerCase() === normalized,
+      ) ?? null
+    );
+  }
+
+  const byLocalPart = profiles.find(
+    (profile) =>
+      profile.email.toLowerCase().split("@")[0] === normalized,
+  );
+  if (byLocalPart) return byLocalPart;
+
+  return (
+    profiles.find(
+      (profile) =>
+        profile.email.toLowerCase() === `${normalized}@badartyres.local`,
+    ) ?? null
+  );
+}
+
+async function findProfileByUsername(username: string): Promise<UserRow | null> {
+  const normalized = normalizeUsername(username);
+  const result = await supabase
+    .from("users")
+    .select(USER_COLUMNS)
+    .eq("username", normalized)
+    .limit(1);
+  const row = firstOrNull(assertNoError(result, "findProfileByUsername") as UserRow[]);
+  if (row) return row;
+
+  const profilesResult = await supabase.from("users").select(USER_COLUMNS);
+  const profiles = assertNoError(profilesResult, "findProfileByUsername") as UserRow[];
+  return resolveEmailForLegacyLogin(username, profiles);
+}
 
 /**
  * Returns all users.
  */
 export async function getUsers(): Promise<User[]> {
   await simulateLatency();
-  return readData<User[]>(FILE_NAME);
+  const result = await supabase.from("users").select(USER_COLUMNS).order("name");
+  const rows = assertNoError(result, "getUsers");
+  return (rows ?? []).map(userFromRow);
 }
 
 /**
@@ -19,8 +83,13 @@ export async function getUsers(): Promise<User[]> {
  */
 export async function getUserById(id: string): Promise<User | null> {
   await simulateLatency();
-  const users = await readData<User[]>(FILE_NAME);
-  return users.find((user) => user.id === id) ?? null;
+  const result = await supabase
+    .from("users")
+    .select(USER_COLUMNS)
+    .eq("id", id)
+    .limit(1);
+  const row = firstOrNull(assertNoError(result, "getUserById") as UserRow[]);
+  return row ? userFromRow(row) : null;
 }
 
 /**
@@ -29,17 +98,77 @@ export async function getUserById(id: string): Promise<User | null> {
  */
 export async function getTechnicians(): Promise<User[]> {
   await simulateLatency();
-  const users = await readData<User[]>(FILE_NAME);
-  return users.filter((user) => user.role === "Technician");
+  const result = await supabase
+    .from("users")
+    .select(USER_COLUMNS)
+    .eq("role", "Technician")
+    .order("name");
+  const rows = assertNoError(result, "getTechnicians");
+  return (rows ?? []).map(userFromRow);
 }
 
-export async function createUser(data: Omit<User, "id">): Promise<User> {
+export async function createUser(data: CreateUserInput): Promise<User> {
   await simulateLatency();
-  const newUser: User = { ...data, id: `usr_${Date.now()}` };
-  const users = await readData<User[]>(FILE_NAME);
-  users.push(newUser);
-  await writeData(FILE_NAME, users);
-  return newUser;
+
+  const username = normalizeUsername(data.username);
+  if (!username) {
+    throw new Error("Username is required.");
+  }
+  if (!data.password?.trim()) {
+    throw new Error("Password is required.");
+  }
+
+  const email =
+    data.email?.trim() ||
+    `${username}@badartyres.local`;
+
+  const existingUsername = await supabase
+    .from("users")
+    .select("id")
+    .eq("username", username)
+    .limit(1);
+  if (firstOrNull(assertNoError(existingUsername, "createUser") as { id: string }[])) {
+    throw new Error("That username is already taken.");
+  }
+
+  const { data: authData, error: authError } =
+    await getSupabaseAdmin().auth.admin.createUser({
+      email,
+      password: data.password,
+      email_confirm: true,
+      user_metadata: {
+        username,
+        name: data.name,
+        role: data.role,
+        phone: data.phone ?? "",
+      },
+    });
+
+  if (authError || !authData.user) {
+    throw new Error(authError?.message ?? "Failed to create login account.");
+  }
+
+  const newUser: User = {
+    id: authData.user.id,
+    name: data.name,
+    username,
+    role: data.role,
+    email,
+    phone: data.phone ?? "",
+  };
+
+  const result = await supabase
+    .from("users")
+    .insert(userToRow(newUser))
+    .select(USER_COLUMNS)
+    .single();
+
+  if (result.error) {
+    await getSupabaseAdmin().auth.admin.deleteUser(authData.user.id);
+    throw new Error(result.error.message);
+  }
+
+  return userFromRow(assertNoError(result, "createUser") as UserRow);
 }
 
 export async function updateUser(
@@ -48,24 +177,48 @@ export async function updateUser(
   actingUserId: string,
 ): Promise<User | null> {
   await simulateLatency();
-  const users = await readData<User[]>(FILE_NAME);
-  const userIndex = users.findIndex((u) => u.id === id);
-  if (userIndex === -1) return null;
+  const existingResult = await supabase
+    .from("users")
+    .select(USER_COLUMNS)
+    .eq("id", id)
+    .limit(1)
+    .single();
+  const existingRow = assertNoError(existingResult, "updateUser") as UserRow;
+  if (!existingRow) return null;
 
-  const targetUser = users[userIndex];
+  const existing = userFromRow(existingRow);
 
   if (
     data.role &&
-    targetUser.id === actingUserId &&
-    targetUser.role === "Admin" &&
+    existing.id === actingUserId &&
+    existing.role === "Admin" &&
     data.role !== "Admin"
   ) {
     throw new Error("Admins cannot demote their own role.");
   }
 
-  users[userIndex] = { ...targetUser, ...data };
-  await writeData(FILE_NAME, users);
-  return users[userIndex];
+  if (data.username) {
+    const username = normalizeUsername(data.username);
+    const clash = await supabase
+      .from("users")
+      .select("id")
+      .eq("username", username)
+      .neq("id", id)
+      .limit(1);
+    if (firstOrNull(assertNoError(clash, "updateUser") as { id: string }[])) {
+      throw new Error("That username is already taken.");
+    }
+    data.username = username;
+  }
+
+  const updated: User = { ...existing, ...data };
+  const result = await supabase
+    .from("users")
+    .update(userToRow(updated, existingRow.created_at))
+    .eq("id", id)
+    .select(USER_COLUMNS)
+    .single();
+  return userFromRow(assertNoError(result, "updateUser") as UserRow);
 }
 
 export async function updateUserRole(
@@ -81,27 +234,50 @@ export async function deleteUser(id: string, actingUserId: string): Promise<void
   if (id === actingUserId) {
     throw new Error("Admins cannot delete their own account.");
   }
-  const users = await readData<User[]>(FILE_NAME);
-  const filtered = users.filter((u) => u.id !== id);
-  await writeData(FILE_NAME, filtered);
-}
 
-export async function verifyLogin(username: string, password: string): Promise<{ token: string; user: User }> {
-  await simulateLatency();
-  const users = await readData<(User & { password?: string })[]>(FILE_NAME);
-  
-  const user = users.find(
-    (u) => u.username?.toLowerCase() === username.toLowerCase()
-  );
+  const existing = await getUserById(id);
+  if (!existing) return;
 
-  if (!user || user.password !== password) {
-    throw new Error('Invalid username or password');
+  const { error: authDeleteError } =
+    await getSupabaseAdmin().auth.admin.deleteUser(id);
+  if (authDeleteError && !authDeleteError.message.includes("not found")) {
+    const { data: authUsers } = await getSupabaseAdmin().auth.admin.listUsers({
+      perPage: 1000,
+    });
+    const authUser = authUsers.users.find(
+      (user) => user.email?.toLowerCase() === existing.email.toLowerCase(),
+    );
+    if (authUser) {
+      await getSupabaseAdmin().auth.admin.deleteUser(authUser.id);
+    }
   }
 
-  const { password: _, ...safeUser } = user;
+  const result = await supabase.from("users").delete().eq("id", id);
+  assertNoError(result, "deleteUser");
+}
+
+export async function verifyLogin(
+  username: string,
+  password: string,
+): Promise<{ token: string; user: User }> {
+  await simulateLatency();
+
+  const profile = await findProfileByUsername(username);
+  if (!profile) {
+    throw new Error("Invalid username or password");
+  }
+
+  const authResult = await getSupabaseAuthClient().auth.signInWithPassword({
+    email: profile.email,
+    password,
+  });
+
+  if (authResult.error || !authResult.data.session) {
+    throw new Error("Invalid username or password");
+  }
 
   return {
-    token: `token-${safeUser.id}-${Date.now()}`,
-    user: safeUser as User,
+    token: authResult.data.session.access_token,
+    user: userFromRow(profile),
   };
 }

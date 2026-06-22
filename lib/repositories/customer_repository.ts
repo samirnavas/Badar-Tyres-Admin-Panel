@@ -4,18 +4,32 @@ import type { Customer } from "../models/Customer";
 import type { Vehicle } from "../models/Vehicle";
 import type { JobCard } from "../models/JobCard";
 import { normalizeJobStatus } from "../models/JobCard";
-import { readData, writeData } from "../db";
+import { assertNoError, firstOrNull } from "../database/helpers";
+import {
+  customerFromRow,
+  customerToRow,
+  jobFromRow,
+  vehicleFromRow,
+  type CustomerRow,
+  type JobRow,
+  type VehicleRow,
+} from "../database/mappers";
 import { generateId } from "../generateId";
+import { supabase } from "../supabase";
 import { simulateLatency } from "./delay";
-
-const FILE_NAME = "customers.json";
 
 /**
  * Returns all customers.
  */
 export async function getCustomers(): Promise<Customer[]> {
   await simulateLatency();
-  return readData<Customer[]>(FILE_NAME);
+  const result = await supabase
+    .from("customers")
+    .select("*")
+    .order("first_name")
+    .order("last_name");
+  const rows = assertNoError(result, "getCustomers") as CustomerRow[];
+  return (rows ?? []).map(customerFromRow);
 }
 
 /**
@@ -23,12 +37,13 @@ export async function getCustomers(): Promise<Customer[]> {
  */
 export async function getCustomerById(id: string): Promise<Customer | null> {
   await simulateLatency();
-  const customers = await readData<Customer[]>(FILE_NAME);
-  return customers.find((customer) => customer.id === id) ?? null;
+  const result = await supabase.from("customers").select("*").eq("id", id).limit(1);
+  const row = firstOrNull(assertNoError(result, "getCustomerById") as CustomerRow[]);
+  return row ? customerFromRow(row) : null;
 }
 
 /**
- * Creates a new customer, persists it to the JSON file, and returns it.
+ * Creates a new customer, persists it to the database, and returns it.
  */
 export async function createCustomer(
   data: Omit<Customer, "id" | "created_at">,
@@ -41,11 +56,12 @@ export async function createCustomer(
     created_at: new Date().toISOString(),
   };
 
-  const customers = await readData<Customer[]>(FILE_NAME);
-  customers.push(customer);
-  await writeData(FILE_NAME, customers);
-
-  return customer;
+  const result = await supabase
+    .from("customers")
+    .insert(customerToRow(customer))
+    .select("*")
+    .single();
+  return customerFromRow(assertNoError(result, "createCustomer") as CustomerRow);
 }
 
 export interface CustomerListWithLTV {
@@ -56,10 +72,20 @@ export interface CustomerListWithLTV {
 export async function getCustomersListWithLTV(): Promise<CustomerListWithLTV[]> {
   await simulateLatency();
 
-  const customers = await readData<Customer[]>(FILE_NAME);
-  const jobs = await readData<JobCard[]>("jobs.json");
+  const [customersResult, jobsResult] = await Promise.all([
+    supabase
+      .from("customers")
+      .select("*")
+      .order("first_name")
+      .order("last_name"),
+    supabase.from("jobs").select("*"),
+  ]);
 
-  // Group jobs by customer to compute LTV efficiently
+  const customers = (assertNoError(customersResult, "getCustomersListWithLTV") as CustomerRow[]).map(
+    customerFromRow,
+  );
+  const jobs = (assertNoError(jobsResult, "getCustomersListWithLTV") as JobRow[]).map((row) => jobFromRow(row));
+
   const ltvMap = new Map<string, number>();
   for (const job of jobs) {
     if (normalizeJobStatus(job.status) === "Completed" || normalizeJobStatus(job.status) === "Closed") {
@@ -84,15 +110,19 @@ export interface Customer360 {
 export async function getCustomer360(customerId: string): Promise<Customer360 | null> {
   await simulateLatency();
 
-  const customers = await readData<Customer[]>(FILE_NAME);
-  const customer = customers.find((c) => c.id === customerId);
+  const customer = await getCustomerById(customerId);
   if (!customer) return null;
 
-  const vehicles = await readData<Vehicle[]>("vehicles.json");
-  const customerVehicles = vehicles.filter((v) => v.customer_id === customerId);
+  const [vehiclesResult, jobsResult] = await Promise.all([
+    supabase.from("vehicles").select("*").eq("customer_id", customerId),
+    supabase.from("jobs").select("*").eq("customer_id", customerId),
+  ]);
 
-  const jobs = await readData<JobCard[]>("jobs.json");
-  const customerJobs = jobs.filter((j) => j.customer_id === customerId);
+  const customerVehicles = (assertNoError(vehiclesResult, "getCustomer360") as VehicleRow[]).map(
+    vehicleFromRow,
+  );
+
+  const customerJobs = (assertNoError(jobsResult, "getCustomer360") as JobRow[]).map((row) => jobFromRow(row));
 
   const ltv = customerJobs.reduce((sum, job) => {
     if (normalizeJobStatus(job.status) === "Completed" || normalizeJobStatus(job.status) === "Closed") {

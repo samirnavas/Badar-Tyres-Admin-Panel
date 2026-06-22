@@ -3,39 +3,46 @@
 import type {
   Invoice,
   InvoiceInput,
-  InvoiceStatus,
   RecordPaymentInput,
 } from "../models/Invoice";
 import { deriveInvoiceStatus } from "../models/Invoice";
-import type { JobCard } from "../models/JobCard";
-import { readData, writeData } from "../db";
+import { assertNoError, firstOrNull } from "../database/helpers";
+import {
+  invoiceFromRow,
+  invoiceToRow,
+  jobFromRow,
+  jobToRow,
+  type InvoiceRow,
+  type JobRow,
+} from "../database/mappers";
 import { generateId } from "../generateId";
+import { supabase } from "../supabase";
 import { simulateLatency } from "./delay";
-
-const FILE_NAME = "invoices.json";
-const JOBS_FILE = "jobs.json";
 
 class InvoiceRepository {
   async getInvoices(): Promise<Invoice[]> {
     await simulateLatency();
-    return readData<Invoice[]>(FILE_NAME);
+    const result = await supabase.from("invoices").select("*").order("created_at", { ascending: false });
+    const rows = assertNoError(result, "getInvoices") as InvoiceRow[];
+    return (rows ?? []).map(invoiceFromRow);
   }
 
   async getInvoiceById(id: string): Promise<Invoice | null> {
     await simulateLatency();
-    const invoices = await readData<Invoice[]>(FILE_NAME);
-    return invoices.find((invoice) => invoice.id === id) ?? null;
+    const result = await supabase.from("invoices").select("*").eq("id", id).limit(1);
+    const row = firstOrNull(assertNoError(result, "getInvoiceById") as InvoiceRow[]);
+    return row ? invoiceFromRow(row) : null;
   }
 
   async getInvoicesByJobId(jobId: string): Promise<Invoice[]> {
     await simulateLatency();
-    const invoices = await readData<Invoice[]>(FILE_NAME);
-    return invoices
-      .filter((invoice) => invoice.jobId === jobId)
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+    const result = await supabase
+      .from("invoices")
+      .select("*")
+      .eq("job_id", jobId)
+      .order("created_at", { ascending: false });
+    const rows = assertNoError(result, "getInvoicesByJobId") as InvoiceRow[];
+    return (rows ?? []).map(invoiceFromRow);
   }
 
   async createInvoice(data: InvoiceInput): Promise<Invoice> {
@@ -50,15 +57,18 @@ class InvoiceRepository {
       updatedAt: now,
     };
 
-    const invoices = await readData<Invoice[]>(FILE_NAME);
-    invoices.unshift(invoice);
-    await writeData(FILE_NAME, invoices);
+    const result = await supabase
+      .from("invoices")
+      .insert(invoiceToRow(invoice))
+      .select("*")
+      .single();
+    const created = invoiceFromRow(assertNoError(result, "createInvoice") as InvoiceRow);
 
-    if (invoice.status === "Paid") {
-      await this.closeParentJob(invoice.jobId);
+    if (created.status === "Paid") {
+      await this.closeParentJob(created.jobId);
     }
 
-    return invoice;
+    return created;
   }
 
   async updateInvoice(
@@ -67,13 +77,11 @@ class InvoiceRepository {
   ): Promise<Invoice> {
     await simulateLatency();
 
-    const invoices = await readData<Invoice[]>(FILE_NAME);
-    const index = invoices.findIndex((invoice) => invoice.id === id);
-    if (index === -1) {
+    const current = await this.getInvoiceById(id);
+    if (!current) {
       throw new Error("Invoice not found");
     }
 
-    const current = invoices[index];
     const amountPaid = data.amountPaid ?? current.amountPaid;
     const total = data.total ?? current.total;
 
@@ -82,19 +90,23 @@ class InvoiceRepository {
       ...data,
       amountPaid,
       total,
-      status:
-        data.status ?? deriveInvoiceStatus(amountPaid, total),
+      status: data.status ?? deriveInvoiceStatus(amountPaid, total),
       updatedAt: new Date().toISOString(),
     };
 
-    invoices[index] = updatedInvoice;
-    await writeData(FILE_NAME, invoices);
+    const result = await supabase
+      .from("invoices")
+      .update(invoiceToRow(updatedInvoice))
+      .eq("id", id)
+      .select("*")
+      .single();
+    const saved = invoiceFromRow(assertNoError(result, "updateInvoice") as InvoiceRow);
 
-    if (updatedInvoice.status === "Paid") {
-      await this.closeParentJob(updatedInvoice.jobId);
+    if (saved.status === "Paid") {
+      await this.closeParentJob(saved.jobId);
     }
 
-    return updatedInvoice;
+    return saved;
   }
 
   async recordPayment(
@@ -103,13 +115,10 @@ class InvoiceRepository {
   ): Promise<Invoice> {
     await simulateLatency();
 
-    const invoices = await readData<Invoice[]>(FILE_NAME);
-    const index = invoices.findIndex((invoice) => invoice.id === id);
-    if (index === -1) {
+    const current = await this.getInvoiceById(id);
+    if (!current) {
       throw new Error("Invoice not found");
     }
-
-    const current = invoices[index];
 
     const updatedInvoice: Invoice = {
       ...current,
@@ -119,14 +128,19 @@ class InvoiceRepository {
       updatedAt: new Date().toISOString(),
     };
 
-    invoices[index] = updatedInvoice;
-    await writeData(FILE_NAME, invoices);
+    const result = await supabase
+      .from("invoices")
+      .update(invoiceToRow(updatedInvoice))
+      .eq("id", id)
+      .select("*")
+      .single();
+    const saved = invoiceFromRow(assertNoError(result, "recordPayment") as InvoiceRow);
 
-    if (updatedInvoice.status === "Paid") {
-      await this.closeParentJob(updatedInvoice.jobId);
+    if (saved.status === "Paid") {
+      await this.closeParentJob(saved.jobId);
     }
 
-    return updatedInvoice;
+    return saved;
   }
 
   async applyDiscount(
@@ -136,18 +150,21 @@ class InvoiceRepository {
   ): Promise<Invoice> {
     await simulateLatency();
 
-    const invoices = await readData<Invoice[]>(FILE_NAME);
-    const index = invoices.findIndex((invoice) => invoice.id === id);
-    if (index === -1) {
+    const current = await this.getInvoiceById(id);
+    if (!current) {
       throw new Error("Invoice not found");
     }
 
-    const current = invoices[index];
+    const jobResult = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("id", current.jobId)
+      .limit(1)
+      .single();
+    const jobRow = assertNoError(jobResult, "applyDiscount") as JobRow;
+    if (!jobRow) throw new Error("Job not found");
 
-    const jobs = await readData<JobCard[]>(JOBS_FILE);
-    const job = jobs.find((j) => j.id === current.jobId);
-    if (!job) throw new Error("Job not found");
-
+    const job = jobFromRow(jobRow);
     const originalTotal = job.total_amount;
 
     const discountValue =
@@ -167,23 +184,25 @@ class InvoiceRepository {
       updatedAt: new Date().toISOString(),
     };
 
-    invoices[index] = updatedInvoice;
-    await writeData(FILE_NAME, invoices);
+    const result = await supabase
+      .from("invoices")
+      .update(invoiceToRow(updatedInvoice))
+      .eq("id", id)
+      .select("*")
+      .single();
+    const saved = invoiceFromRow(assertNoError(result, "applyDiscount") as InvoiceRow);
 
-    if (updatedInvoice.status === "Paid") {
-      await this.closeParentJob(updatedInvoice.jobId);
+    if (saved.status === "Paid") {
+      await this.closeParentJob(saved.jobId);
     }
 
-    return updatedInvoice;
+    return saved;
   }
 
   async deleteInvoice(id: string): Promise<void> {
     await simulateLatency();
-    const invoices = await readData<Invoice[]>(FILE_NAME);
-    await writeData(
-      FILE_NAME,
-      invoices.filter((invoice) => invoice.id !== id),
-    );
+    const result = await supabase.from("invoices").delete().eq("id", id);
+    assertNoError(result, "deleteInvoice");
   }
 
   async getOrCreateInvoiceForJob(jobId: string): Promise<Invoice | null> {
@@ -192,9 +211,11 @@ class InvoiceRepository {
       return existing[0];
     }
 
-    const jobs = await readData<JobCard[]>(JOBS_FILE);
-    const job = jobs.find((entry) => entry.id === jobId);
-    if (!job) return null;
+    const jobResult = await supabase.from("jobs").select("*").eq("id", jobId).limit(1).single();
+    const jobRow = assertNoError(jobResult, "getOrCreateInvoiceForJob") as JobRow;
+    if (!jobRow) return null;
+
+    const job = jobFromRow(jobRow);
 
     return this.createInvoice({
       jobId: job.id,
@@ -211,16 +232,16 @@ class InvoiceRepository {
   }
 
   private async closeParentJob(jobId: string): Promise<void> {
-    const jobs = await readData<JobCard[]>(JOBS_FILE);
-    const index = jobs.findIndex((job) => job.id === jobId);
-    if (index === -1) return;
+    const jobResult = await supabase.from("jobs").select("*").eq("id", jobId).limit(1).single();
+    const jobRow = assertNoError(jobResult, "closeParentJob") as JobRow;
+    if (!jobRow) return;
 
-    jobs[index] = {
-      ...jobs[index],
-      status: "Closed",
-      updated_at: new Date().toISOString(),
-    };
-    await writeData(JOBS_FILE, jobs);
+    const job = jobFromRow(jobRow);
+    job.status = "Closed";
+    job.updated_at = new Date().toISOString();
+
+    const result = await supabase.from("jobs").update(jobToRow(job)).eq("id", jobId);
+    assertNoError(result, "closeParentJob");
   }
 }
 
@@ -283,7 +304,7 @@ export interface BillingMetrics {
 
 export async function getBillingMetrics(): Promise<BillingMetrics> {
   await simulateLatency();
-  const invoices = await readData<Invoice[]>(FILE_NAME);
+  const invoices = await invoiceRepository.getInvoices();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);

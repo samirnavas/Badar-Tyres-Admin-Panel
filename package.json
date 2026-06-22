@@ -7,11 +7,17 @@
     "dev:admin": "next dev -p 3001",
     "build": "node scripts/generate-pwa-icons.mjs && next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:supabase": "node scripts/migrate-to-supabase.mjs",
+    "migrate:user-credentials": "node scripts/migrate-user-credentials.mjs",
+    "migrate:user-usernames": "node scripts/migrate-user-usernames.mjs",
+    "migrate:manufacturers": "node scripts/migrate-manufacturers.mjs",
+    "migrate:service-stock": "node scripts/migrate-service-stock.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
     "@serwist/next": "^9.5.11",
+    "@supabase/supabase-js": "^2.108.2",
     "@tanstack/query-sync-storage-persister": "^5.101.0",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-query-persist-client": "^5.101.0",

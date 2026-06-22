@@ -14,18 +14,14 @@ import {
   UserCog,
   Loader2,
   CheckCircle2,
-  CarFront,
   Trash2,
   Plus,
-  X,
   KeyRound,
 } from "lucide-react";
 import { updateSettings } from "@/lib/repositories/settings_repository";
-import { createManufacturer, deleteManufacturer } from "@/lib/repositories/manufacturer_repository";
 import { deleteUser } from "@/lib/repositories/user_repository";
 import type { ShopSettings } from "@/lib/models/ShopSettings";
 import type { UserRole, User } from "@/lib/models/User";
-import type { Manufacturer } from "@/lib/models/Manufacturer";
 import { cn } from "@/lib/format";
 import { settingsSchema, type SettingsForm } from "./schema";
 import { AddUserModal } from "./AddUserModal";
@@ -34,7 +30,6 @@ import { PermissionsMatrix } from "@/components/settings/PermissionsMatrix";
 const allSections = [
   { id: "general", label: "General Information", icon: Store },
   { id: "billing", label: "Billing & Taxes", icon: Receipt },
-  { id: "manufacturers", label: "Manage Vehicle Manufacturers", icon: CarFront },
   { id: "team", label: "Team Management", icon: UsersRound, adminOnly: true },
   { id: "permissions", label: "Role Permissions", icon: KeyRound, adminOnly: true },
 ] as const;
@@ -75,11 +70,9 @@ const roleStyles: Record<UserRole, { label: string; className: string; icon: typ
 export default function SettingsClient({
   initialSettings,
   initialUsers,
-  initialManufacturers,
 }: {
   initialSettings: ShopSettings;
   initialUsers: User[];
-  initialManufacturers: Manufacturer[];
 }) {
   const router = useRouter();
   const { user: currentUser } = useAuth();
@@ -90,10 +83,6 @@ export default function SettingsClient({
   const [activeSection, setActiveSection] = useState<string>("general");
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Manufacturers state
-  const [newManufacturerName, setNewManufacturerName] = useState("");
-  const [isAddingManufacturer, setIsAddingManufacturer] = useState(false);
 
   // Users state
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -121,32 +110,6 @@ export default function SettingsClient({
       alert("Failed to save settings");
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleAddManufacturer = async () => {
-    if (!newManufacturerName.trim()) return;
-    setIsAddingManufacturer(true);
-    try {
-      await createManufacturer(newManufacturerName.trim());
-      setNewManufacturerName("");
-      router.refresh();
-    } catch (e) {
-      console.error(e);
-      alert("Failed to add manufacturer");
-    } finally {
-      setIsAddingManufacturer(false);
-    }
-  };
-
-  const handleDeleteManufacturer = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this manufacturer?")) return;
-    try {
-      await deleteManufacturer(id);
-      router.refresh();
-    } catch (e) {
-      console.error(e);
-      alert("Failed to delete manufacturer");
     }
   };
 
@@ -297,55 +260,6 @@ export default function SettingsClient({
                   placeholder="These terms print at the bottom of every invoice."
                 />
               </Field>
-            </Section>
-
-            {/* Manufacturers */}
-            <Section
-              id="manufacturers"
-              icon={<CarFront className="h-4 w-4" />}
-              title="Manage Vehicle Manufacturers"
-              description="Manage the list of vehicle manufacturers available when adding new vehicles."
-            >
-              <div className="flex flex-wrap gap-3">
-                {initialManufacturers.map((m) => (
-                  <div key={m.id} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-700">
-                    {m.name}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteManufacturer(m.id)}
-                      className="ml-1 rounded-full p-0.5 text-gray-400 hover:bg-gray-200 hover:text-red-600 focus:outline-none"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-                {initialManufacturers.length === 0 && (
-                  <span className="text-sm text-gray-500">No manufacturers found.</span>
-                )}
-              </div>
-              <div className="mt-4 flex items-center gap-3">
-                <input
-                  type="text"
-                  value={newManufacturerName}
-                  onChange={(e) => setNewManufacturerName(e.target.value)}
-                  placeholder="New manufacturer name..."
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddManufacturer();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleAddManufacturer}
-                  disabled={!newManufacturerName.trim() || isAddingManufacturer}
-                  className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
-                >
-                  <Plus className="h-4 w-4" /> Add
-                </button>
-              </div>
             </Section>
 
             {/* Team — Admin only */}

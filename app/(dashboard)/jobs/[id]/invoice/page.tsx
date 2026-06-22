@@ -36,7 +36,7 @@ interface InvoiceLine {
 const invoiceStatusStyles: Record<InvoiceStatus, string> = {
   Unpaid: "bg-gray-100 text-gray-700",
   Partial: "bg-gray-200 text-gray-800",
-  Paid: "bg-gray-900 text-white",
+  Paid: "bg-gray-900 text-black",
 };
 
 export default function InvoicePage({

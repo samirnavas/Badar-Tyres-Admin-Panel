@@ -1,14 +1,10 @@
 export const dynamic = 'force-dynamic';
 
-import { getSettings, getUsers, getManufacturers } from "@/lib/repositories";
+import { getSettings, getUsers } from "@/lib/repositories";
 import SettingsClient from "./SettingsClient";
 
 export default async function SettingsPage() {
-  const [settings, users, manufacturers] = await Promise.all([
-    getSettings(),
-    getUsers(),
-    getManufacturers()
-  ]);
+  const [settings, users] = await Promise.all([getSettings(), getUsers()]);
 
-  return <SettingsClient initialSettings={settings} initialUsers={users} initialManufacturers={manufacturers} />;
+  return <SettingsClient initialSettings={settings} initialUsers={users} />;
 }
