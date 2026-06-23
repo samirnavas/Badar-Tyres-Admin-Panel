@@ -74,7 +74,7 @@ async function findProfileByUsername(username: string): Promise<UserRow | null> 
 export async function getUsers(): Promise<User[]> {
   await simulateLatency();
   const result = await supabase.from("users").select(USER_COLUMNS).order("name");
-  const rows = assertNoError(result, "getUsers");
+  const rows = assertNoError(result, "getUsers") as UserRow[];
   return (rows ?? []).map(userFromRow);
 }
 
@@ -103,7 +103,7 @@ export async function getTechnicians(): Promise<User[]> {
     .select(USER_COLUMNS)
     .eq("role", "Technician")
     .order("name");
-  const rows = assertNoError(result, "getTechnicians");
+  const rows = assertNoError(result, "getTechnicians") as UserRow[];
   return (rows ?? []).map(userFromRow);
 }
 
@@ -245,7 +245,7 @@ export async function deleteUser(id: string, actingUserId: string): Promise<void
       perPage: 1000,
     });
     const authUser = authUsers.users.find(
-      (user) => user.email?.toLowerCase() === existing.email.toLowerCase(),
+      (user: any) => user.email?.toLowerCase() === existing.email.toLowerCase(),
     );
     if (authUser) {
       await getSupabaseAdmin().auth.admin.deleteUser(authUser.id);
@@ -262,22 +262,41 @@ export async function verifyLogin(
 ): Promise<{ token: string; user: User }> {
   await simulateLatency();
 
-  const profile = await findProfileByUsername(username);
-  if (!profile) {
-    throw new Error("Invalid username or password");
+  let emailToUse = username.trim().toLowerCase();
+
+  // If it's not an email, assume it's a username and fetch the mapped email from public.users
+  if (!emailToUse.includes("@")) {
+    const profile = await findProfileByUsername(username);
+    if (!profile) {
+      throw new Error("Invalid username or password");
+    }
+    emailToUse = profile.email;
   }
 
   const authResult = await getSupabaseAuthClient().auth.signInWithPassword({
-    email: profile.email,
+    email: emailToUse,
     password,
   });
 
-  if (authResult.error || !authResult.data.session) {
+  if (authResult.error || !authResult.data.session || !authResult.data.user) {
     throw new Error("Invalid username or password");
+  }
+
+  // Strictly fetch the public profile using the Foreign Key (Auth UUID)
+  const authUserId = authResult.data.user.id;
+  const userResult = await supabase
+    .from("users")
+    .select(USER_COLUMNS)
+    .eq("id", authUserId)
+    .single();
+
+  if (userResult.error || !userResult.data) {
+    await getSupabaseAuthClient().auth.signOut();
+    throw new Error("Your user profile was not found. Please contact an admin to link your account.");
   }
 
   return {
     token: authResult.data.session.access_token,
-    user: userFromRow(profile),
+    user: userFromRow(userResult.data as UserRow),
   };
 }
