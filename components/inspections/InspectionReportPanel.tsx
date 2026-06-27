@@ -40,7 +40,10 @@ function InspectionItemCard({
   item: InspectionItem;
   onAddToEstimate: (item: InspectionItem) => void;
 }) {
-  const styles = conditionStyles[item.condition];
+  const styles = conditionStyles[item.condition as InspectionCondition] || {
+    badge: "bg-gray-100 text-gray-700",
+    border: "border-gray-200",
+  };
   const showUpsell =
     item.condition === "Yellow" || item.condition === "Red";
 

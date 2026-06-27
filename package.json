@@ -12,7 +12,9 @@
     "migrate:user-credentials": "node scripts/migrate-user-credentials.mjs",
     "migrate:user-usernames": "node scripts/migrate-user-usernames.mjs",
     "migrate:manufacturers": "node scripts/migrate-manufacturers.mjs",
-    "migrate:service-stock": "node scripts/migrate-service-stock.mjs"
+    "migrate:service-stock": "node scripts/migrate-service-stock.mjs",
+    "migrate:job-display-fields": "node scripts/migrate-job-display-fields.mjs",
+    "migrate:technician-rpc": "node scripts/migrate-technician-rpc.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -38,6 +40,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "pg": "^8.22.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
