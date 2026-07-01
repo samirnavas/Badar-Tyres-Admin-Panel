@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, ShieldCheck } from "lucide-react";
+import { Plus, ShieldCheck, Search, Filter, ArrowUpDown, ChevronDown } from "lucide-react";
 import { getJobCards, getCustomers, getVehicles, getTechnicians } from "@/lib/repositories";
 import type { JobCard } from "@/lib/models/JobCard";
 import { normalizeJobStatus, getJobTechnicianId } from "@/lib/models/JobCard";
@@ -50,8 +50,10 @@ interface JobRow extends JobCard {
 
 export default function JobsPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<PipelineFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<PipelineFilter>("all");
   const [selectedTechnician, setSelectedTechnician] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "total-desc">("newest");
 
   const jobsQuery = useQuery({ queryKey: ["job-cards"], queryFn: getJobCards });
   const customersQuery = useQuery({
@@ -93,8 +95,8 @@ export default function JobsPage() {
       (techniciansQuery.data ?? []).map((t) => [t.id, t]),
     );
 
-    return (jobsQuery.data ?? [])
-      .filter((job) => matchesPipelineFilter(job.status, tab))
+    let result = (jobsQuery.data ?? [])
+      .filter((job) => matchesPipelineFilter(job.status, statusFilter))
       .filter(
         (job) =>
           selectedTechnician === "all" ||
@@ -114,20 +116,44 @@ export default function JobsPage() {
           warrantyActive: isWarrantyActive(job.warranty_end_date),
         };
       });
+
+    const q = searchQuery.toLowerCase().trim();
+    if (q) {
+      result = result.filter(
+        (r) =>
+          r.customerName.toLowerCase().includes(q) ||
+          r.vehicleModel.toLowerCase().includes(q) ||
+          r.vehicleRegistration.toLowerCase().includes(q)
+      );
+    }
+
+    result.sort((a, b) => {
+      if (sortBy === "total-desc") {
+        return b.total_amount - a.total_amount;
+      } else if (sortBy === "oldest") {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      } else {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+    });
+
+    return result;
   }, [
     jobsQuery.data,
     customersQuery.data,
     vehiclesQuery.data,
     techniciansQuery.data,
-    tab,
+    statusFilter,
     selectedTechnician,
+    searchQuery,
+    sortBy,
   ]);
 
   const goToJob = (id: string) => router.push(`/jobs/${id}`);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="flex h-[calc(100vh-8rem)] flex-col space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">
             Job Cards
@@ -145,34 +171,54 @@ export default function JobsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {tabs.map((t) => (
-            <button
-              key={t.value}
-              onClick={() => setTab(t.value)}
-              className={cn(
-                "rounded-lg border px-3.5 py-1.5 text-sm font-medium transition-colors",
-                tab === t.value
-                  ? "border-theme-accent bg-theme-accent text-white"
-                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-center justify-between gap-4 shrink-0">
+        <div className="relative w-full max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by customer or vehicle..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-theme-accent focus:outline-none focus:ring-1 focus:ring-theme-accent"
+          />
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
-            Technician:
-          </label>
-          <div className="w-48">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[140px]">
+            <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as PipelineFilter)}
+              className="w-full appearance-none rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-9 text-sm text-gray-900 focus:border-theme-accent focus:outline-none focus:ring-1 focus:ring-theme-accent cursor-pointer"
+            >
+              <option value="all">All Statuses</option>
+              <option value="estimates">Estimates</option>
+              <option value="active">Active Jobs</option>
+              <option value="completed">Completed</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          </div>
+
+          <div className="relative min-w-[160px]">
+            <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="w-full appearance-none rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-9 text-sm text-gray-900 focus:border-theme-accent focus:outline-none focus:ring-1 focus:ring-theme-accent cursor-pointer"
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="total-desc">Highest Total</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          </div>
+
+          <div className="w-48 relative">
             <Combobox
               options={technicianOptions}
               value={selectedTechnician}
               onChange={(value) => setSelectedTechnician(value || "all")}
-              placeholder={techniciansQuery.isLoading ? "Loading..." : "Select technician..."}
+              placeholder={techniciansQuery.isLoading ? "Loading..." : "All Technicians"}
               disabled={techniciansQuery.isLoading}
             />
           </div>

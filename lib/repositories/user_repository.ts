@@ -132,15 +132,16 @@ export async function createUser(data: CreateUserInput): Promise<User> {
   }
 
   const { data: authData, error: authError } =
-    await getSupabaseAdmin().auth.admin.createUser({
+    await getSupabaseAuthClient().auth.signUp({
       email,
       password: data.password,
-      email_confirm: true,
-      user_metadata: {
-        username,
-        name: data.name,
-        role: data.role,
-        phone: data.phone ?? "",
+      options: {
+        data: {
+          username,
+          name: data.name,
+          role: data.role,
+          phone: data.phone ?? "",
+        },
       },
     });
 
@@ -159,7 +160,7 @@ export async function createUser(data: CreateUserInput): Promise<User> {
 
   const result = await supabase
     .from("users")
-    .insert(userToRow(newUser))
+    .upsert(userToRow(newUser), { onConflict: "id" })
     .select(USER_COLUMNS)
     .single();
 

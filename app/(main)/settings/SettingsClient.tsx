@@ -144,7 +144,11 @@ export default function SettingsClient({
   }, []);
 
   const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const el = document.getElementById(id);
+    if (el) {
+      const y = el.getBoundingClientRect().top + window.scrollY - 96;
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
   };
 
   return (
@@ -159,9 +163,9 @@ export default function SettingsClient({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_1fr]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[180px_1fr]">
           <nav className="hidden lg:block">
-            <div className="sticky top-6 space-y-1">
+            <div className="sticky top-24 space-y-1">
               {sections.map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
@@ -181,7 +185,7 @@ export default function SettingsClient({
             </div>
           </nav>
 
-          <div ref={containerRef} className="space-y-6">
+          <div ref={containerRef} className="space-y-6 min-w-0">
             <Section
               id="general"
               icon={<Store className="h-4 w-4" />}

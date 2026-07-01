@@ -140,7 +140,7 @@ export function PermissionsMatrix() {
                         checked={checked}
                         onChange={() => togglePermission(role, module.route)}
                         className={cn(
-                          "h-4 w-4 rounded border-gray-300 text-theme-accent",
+                          "h-4 w-4 rounded border-gray-300 text-theme-accent accent-theme-accent",
                           "focus:ring-theme-accent",
                         )}
                         aria-label={`${role} — ${module.label}`}

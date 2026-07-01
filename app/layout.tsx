@@ -56,7 +56,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${hankenGrotesk.variable} h-full`}>
+    <html lang="en" className={`${hankenGrotesk.variable}`}>
       <body className="min-h-full bg-canvas text-gray-900 antialiased">
         <Providers>{children}</Providers>
         <Toaster position="bottom-right" richColors />
