@@ -69,11 +69,15 @@ export async function getVehiclesByCustomerId(
  * Creates a new vehicle, persists it to the database, and returns it.
  */
 export async function createVehicle(
-  data: Omit<Vehicle, "id">,
+  data: Omit<Vehicle, "id" | "created_at">,
 ): Promise<Vehicle> {
   await simulateLatency();
 
-  const vehicle: Vehicle = { ...data, id: generateId() };
+  const vehicle: Vehicle = {
+    ...data,
+    id: generateId(),
+    created_at: new Date().toISOString(),
+  };
   const makeId = await resolveMakeId(vehicle.manufacturer);
   const result = await supabase
     .from("vehicles")

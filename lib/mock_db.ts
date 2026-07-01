@@ -84,6 +84,7 @@ export const mockVehicles: Vehicle[] = [
     model: "Innova Crysta",
     registration_number: "KL-07-AB-1234",
     next_service_date: "2026-09-15",
+    created_at: "2026-01-15T10:00:00.000Z",
   },
   {
     id: "ed111111-0000-4000-8000-000000000002",
@@ -93,6 +94,7 @@ export const mockVehicles: Vehicle[] = [
     model: "Classic 350",
     registration_number: "KL-07-CD-5678",
     next_service_date: "2026-08-01",
+    created_at: "2026-02-10T11:30:00.000Z",
   },
   {
     id: "ed111111-0000-4000-8000-000000000003",
@@ -102,6 +104,7 @@ export const mockVehicles: Vehicle[] = [
     model: "Creta",
     registration_number: "KA-01-EF-9012",
     next_service_date: "2026-10-20",
+    created_at: "2026-03-05T09:45:00.000Z",
   },
   {
     id: "ed111111-0000-4000-8000-000000000004",
@@ -111,6 +114,7 @@ export const mockVehicles: Vehicle[] = [
     model: "Bolero Pik-Up",
     registration_number: "TS-09-GH-3456",
     next_service_date: "2026-07-30",
+    created_at: "2026-04-18T14:20:00.000Z",
   },
 ];
 

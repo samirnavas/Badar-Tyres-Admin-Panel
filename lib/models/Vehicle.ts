@@ -13,4 +13,5 @@ export interface Vehicle {
   chassis_number?: string;
   engine_number?: string;
   color?: string;
+  created_at: string;
 }

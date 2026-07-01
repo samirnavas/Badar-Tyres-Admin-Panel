@@ -249,6 +249,7 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     chassis_number: meta.chassis_number,
     engine_number: meta.engine_number,
     color: meta.color,
+    created_at: row.created_at,
   };
 }
 
@@ -305,7 +306,7 @@ export function vehicleToRow(
     plate_number: vehicle.registration_number,
     vin: encodeVehicleMeta(vehicle),
     mileage: 0,
-    created_at: createdAt ?? new Date().toISOString(),
+    created_at: createdAt ?? vehicle.created_at ?? new Date().toISOString(),
   };
 }
 
