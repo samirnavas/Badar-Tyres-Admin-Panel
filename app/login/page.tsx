@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import loginBg from "../../public/login_bg.png";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -107,7 +108,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex">
       <div className="hidden lg:flex lg:w-[55%] relative">
         <Image
-          src="/login_bg.png"
+          src={loginBg}
           alt="Workshop Background"
           fill
           className="object-cover"
@@ -178,7 +179,7 @@ export default function LoginPage() {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
-                  className="w-full border border-gray-300 rounded-lg py-3 pl-11 pr-11 text-[15px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-theme-accent focus:ring-1 focus:ring-theme-accent transition-colors"
+                  className="w-full border border-gray-300 rounded-lg py-3 pl-11 pr-11 text-[15px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-theme-accent focus:ring-1 focus:ring-theme-accent transition-colors [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
                   placeholder="••••••••"
                   {...register("password")}
                 />
