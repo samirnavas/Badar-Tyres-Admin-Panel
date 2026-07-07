@@ -257,47 +257,82 @@ export async function deleteUser(id: string, actingUserId: string): Promise<void
   assertNoError(result, "deleteUser");
 }
 
+export type LoginResult =
+  | { ok: true; token: string; user: User }
+  | { ok: false; error: string };
+
+function getLoginConfigError(): string | null {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()) {
+    return "Server configuration error: NEXT_PUBLIC_SUPABASE_URL is not set.";
+  }
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()) {
+    return "Server configuration error: NEXT_PUBLIC_SUPABASE_ANON_KEY is not set.";
+  }
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+    return "Server configuration error: SUPABASE_SERVICE_ROLE_KEY is not set.";
+  }
+  return null;
+}
+
 export async function verifyLogin(
   username: string,
   password: string,
-): Promise<{ token: string; user: User }> {
-  await simulateLatency();
+): Promise<LoginResult> {
+  const configError = getLoginConfigError();
+  if (configError) {
+    console.error("[verifyLogin]", configError);
+    return { ok: false, error: configError };
+  }
 
-  let emailToUse = username.trim().toLowerCase();
+  try {
+    await simulateLatency();
 
-  // If it's not an email, assume it's a username and fetch the mapped email from public.users
-  if (!emailToUse.includes("@")) {
-    const profile = await findProfileByUsername(username);
-    if (!profile) {
-      throw new Error("Invalid username or password");
+    let emailToUse = username.trim().toLowerCase();
+
+    // If it's not an email, assume it's a username and fetch the mapped email from public.users
+    if (!emailToUse.includes("@")) {
+      const profile = await findProfileByUsername(username);
+      if (!profile) {
+        return { ok: false, error: "Invalid username or password" };
+      }
+      emailToUse = profile.email;
     }
-    emailToUse = profile.email;
+
+    const authResult = await getSupabaseAuthClient().auth.signInWithPassword({
+      email: emailToUse,
+      password,
+    });
+
+    if (authResult.error || !authResult.data.session || !authResult.data.user) {
+      return { ok: false, error: "Invalid username or password" };
+    }
+
+    // Strictly fetch the public profile using the Foreign Key (Auth UUID)
+    const authUserId = authResult.data.user.id;
+    const userResult = await supabase
+      .from("users")
+      .select(USER_COLUMNS)
+      .eq("id", authUserId)
+      .single();
+
+    if (userResult.error || !userResult.data) {
+      await getSupabaseAuthClient().auth.signOut();
+      return {
+        ok: false,
+        error:
+          "Your user profile was not found. Please contact an admin to link your account.",
+      };
+    }
+
+    return {
+      ok: true,
+      token: authResult.data.session.access_token,
+      user: userFromRow(userResult.data as UserRow),
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Login failed due to a server error.";
+    console.error("[verifyLogin]", error);
+    return { ok: false, error: message };
   }
-
-  const authResult = await getSupabaseAuthClient().auth.signInWithPassword({
-    email: emailToUse,
-    password,
-  });
-
-  if (authResult.error || !authResult.data.session || !authResult.data.user) {
-    throw new Error("Invalid username or password");
-  }
-
-  // Strictly fetch the public profile using the Foreign Key (Auth UUID)
-  const authUserId = authResult.data.user.id;
-  const userResult = await supabase
-    .from("users")
-    .select(USER_COLUMNS)
-    .eq("id", authUserId)
-    .single();
-
-  if (userResult.error || !userResult.data) {
-    await getSupabaseAuthClient().auth.signOut();
-    throw new Error("Your user profile was not found. Please contact an admin to link your account.");
-  }
-
-  return {
-    token: authResult.data.session.access_token,
-    user: userFromRow(userResult.data as UserRow),
-  };
 }

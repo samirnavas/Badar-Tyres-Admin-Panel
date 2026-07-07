@@ -66,8 +66,13 @@ export default function LoginPage() {
   const rememberMe = watch("rememberMe");
 
   const loginMutation = useMutation({
-    mutationFn: ({ username, password }: LoginForm) =>
-      verifyLogin(username, password),
+    mutationFn: async ({ username, password }: LoginForm) => {
+      const result = await verifyLogin(username, password);
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
+      return result;
+    },
     onSuccess: async (data, variables) => {
       saveLoginCredentials(
         variables.username,
