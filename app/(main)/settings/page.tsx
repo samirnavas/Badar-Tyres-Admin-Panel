@@ -4,7 +4,13 @@ import { getSettings, getUsers } from "@/lib/repositories";
 import SettingsClient from "./SettingsClient";
 
 export default async function SettingsPage() {
-  const [settings, users] = await Promise.all([getSettings(), getUsers()]);
+  const [settings, users] = await Promise.all([
+    getSettings(),
+    getUsers().catch((error) => {
+      console.error("[SettingsPage] getUsers failed:", error);
+      return [];
+    }),
+  ]);
 
   return <SettingsClient initialSettings={settings} initialUsers={users} />;
 }

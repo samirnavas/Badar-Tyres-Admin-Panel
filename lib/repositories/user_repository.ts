@@ -5,6 +5,7 @@ import { assertNoError, firstOrNull } from "../database/helpers";
 import { userFromRow, userToRow, type UserRow } from "../database/mappers";
 import { getSupabaseAdmin } from "../supabase-admin";
 import { getSupabaseAuthClient, supabase } from "../supabase";
+import { getSupabaseServerConfigError } from "../supabase-config";
 import { simulateLatency } from "./delay";
 
 const USER_COLUMNS = "id, name, email, role, created_at, username, phone";
@@ -261,24 +262,11 @@ export type LoginResult =
   | { ok: true; token: string; user: User }
   | { ok: false; error: string };
 
-function getLoginConfigError(): string | null {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()) {
-    return "Server configuration error: NEXT_PUBLIC_SUPABASE_URL is not set.";
-  }
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()) {
-    return "Server configuration error: NEXT_PUBLIC_SUPABASE_ANON_KEY is not set.";
-  }
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
-    return "Server configuration error: SUPABASE_SERVICE_ROLE_KEY is not set.";
-  }
-  return null;
-}
-
 export async function verifyLogin(
   username: string,
   password: string,
 ): Promise<LoginResult> {
-  const configError = getLoginConfigError();
+  const configError = getSupabaseServerConfigError();
   if (configError) {
     console.error("[verifyLogin]", configError);
     return { ok: false, error: configError };

@@ -101,13 +101,16 @@ export default function SettingsClient({
     setIsSaving(true);
     setSavedAt(null);
     try {
-      await updateSettings(values as ShopSettings);
+      const result = await updateSettings(values as ShopSettings);
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
       setSavedAt(Date.now());
       reset(values);
       router.refresh();
     } catch (e) {
       console.error(e);
-      alert("Failed to save settings");
+      alert(e instanceof Error ? e.message : "Failed to save settings");
     } finally {
       setIsSaving(false);
     }
