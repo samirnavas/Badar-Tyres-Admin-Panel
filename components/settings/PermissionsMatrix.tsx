@@ -33,7 +33,13 @@ export function PermissionsMatrix() {
   }, [permissionsQuery.data]);
 
   const saveMutation = useMutation({
-    mutationFn: updatePermissions,
+    mutationFn: async (draft: Record<string, string[]>) => {
+      const result = await updatePermissions(draft);
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
+      return result.data;
+    },
     onSuccess: async (data) => {
       setDraft(data);
       setSavedAt(Date.now());
