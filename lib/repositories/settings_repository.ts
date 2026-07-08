@@ -9,7 +9,7 @@ import { getSupabaseServerConfigError } from "../supabase-config";
 const SETTINGS_COLUMNS =
   "shop_name, shop_address, contact_phone, contact_email, default_gst_rate, terms_and_conditions";
 
-export const DEFAULT_SETTINGS: ShopSettings = {
+const DEFAULT_SETTINGS: ShopSettings = {
   shop_name: "Badar Tyres & Auto Car",
   shop_address: "Wayanad Road Koduvally, Kozhikode",
   contact_phone: "+91 9188954101",
@@ -18,7 +18,7 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   terms_and_conditions: "This is the terms and conditions.",
 };
 
-export type SettingsUpdateResult =
+type SettingsUpdateResult =
   | { ok: true; data: ShopSettings }
   | { ok: false; error: string };
 
