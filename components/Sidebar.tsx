@@ -56,18 +56,16 @@ export function Sidebar({
       {/* Mobile backdrop */}
       <div
         aria-hidden
+        data-open={open ? "true" : "false"}
         onClick={onClose}
-        className={cn(
-          "fixed inset-0 z-30 bg-gray-900/50 transition-opacity duration-300 ease-in-out lg:hidden",
-          open ? "opacity-100" : "pointer-events-none opacity-0",
-        )}
+        className="mobile-drawer-backdrop lg:hidden"
       />
 
       <aside
+        data-open={open ? "true" : "false"}
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-gray-200 bg-white transition-[transform,width] duration-300 ease-in-out lg:translate-x-0 print:hidden",
-          open ? "translate-x-0" : "-translate-x-full",
-          isCollapsed && "lg:w-16"
+          "mobile-drawer-panel print:hidden",
+          isCollapsed && "lg:w-16",
         )}
       >
         <div className={cn("flex items-center border-b border-gray-200 py-5", isCollapsed ? "px-6 lg:px-0 lg:justify-center" : "px-6")}>

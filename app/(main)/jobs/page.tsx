@@ -152,7 +152,7 @@ export default function JobsPage() {
   const goToJob = (id: string) => router.push(`/jobs/${id}`);
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col space-y-4">
+    <div className="flex flex-col space-y-4 md:h-[calc(100vh-8rem)]">
       <div className="flex flex-wrap items-start justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">
@@ -225,9 +225,9 @@ export default function JobsPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="rounded-xl border border-gray-200 bg-white md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden">
         {/* Desktop table */}
-        <div className="hidden md:block w-full overflow-auto max-h-[calc(100vh-200px)]">
+        <div className="hidden md:block w-full min-h-0 flex-1 overflow-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur shadow-[0_1px_0_rgba(0,0,0,0.1)] text-xs font-semibold text-gray-500 uppercase tracking-wider">
               <tr className="border-b border-gray-200 text-left">

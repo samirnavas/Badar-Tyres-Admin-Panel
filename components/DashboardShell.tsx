@@ -18,11 +18,28 @@ export function DashboardShell({ children, notifications = [] }: { children: Rea
     setSidebarOpen(false);
   }, [pathname]);
 
-  // Prevent background scroll while the mobile drawer is open.
+  // Prevent background scroll while the mobile drawer is open (iOS-safe).
   useEffect(() => {
-    document.body.style.overflow = sidebarOpen ? "hidden" : "";
+    if (!sidebarOpen) return;
+
+    const scrollY = window.scrollY;
+    const { style } = document.body;
+
+    style.overflow = "hidden";
+    style.position = "fixed";
+    style.top = `-${scrollY}px`;
+    style.left = "0";
+    style.right = "0";
+    style.width = "100%";
+
     return () => {
-      document.body.style.overflow = "";
+      style.overflow = "";
+      style.position = "";
+      style.top = "";
+      style.left = "";
+      style.right = "";
+      style.width = "";
+      window.scrollTo(0, scrollY);
     };
   }, [sidebarOpen]);
 
