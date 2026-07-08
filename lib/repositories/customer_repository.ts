@@ -107,25 +107,60 @@ export interface Customer360 {
   ltv: number;
 }
 
+const VEHICLE_SELECT = "*, manufacturers!make_id(name)";
+
+/**
+ * Jobs store customer_id in line_items __meta__, not as a DB column.
+ * Resolve jobs via the customer's vehicles, then keep rows whose meta matches.
+ */
+async function fetchJobsForCustomer(customerId: string): Promise<JobCard[]> {
+  const vehiclesResult = await supabase
+    .from("vehicles")
+    .select("id")
+    .eq("customer_id", customerId);
+  const vehicleIds = (
+    assertNoError(vehiclesResult, "fetchJobsForCustomer") as { id: string }[]
+  ).map((row) => row.id);
+
+  if (vehicleIds.length === 0) {
+    return [];
+  }
+
+  const jobsResult = await supabase
+    .from("jobs")
+    .select("*")
+    .in("vehicle_id", vehicleIds)
+    .order("created_at", { ascending: false });
+
+  return (assertNoError(jobsResult, "fetchJobsForCustomer") as JobRow[])
+    .map((row) => jobFromRow(row))
+    .filter((job) => job.customer_id === customerId || !job.customer_id);
+}
+
 export async function getCustomer360(customerId: string): Promise<Customer360 | null> {
   await simulateLatency();
 
   const customer = await getCustomerById(customerId);
   if (!customer) return null;
 
-  const [vehiclesResult, jobsResult] = await Promise.all([
-    supabase.from("vehicles").select("*").eq("customer_id", customerId),
-    supabase.from("jobs").select("*").eq("customer_id", customerId),
+  const [vehiclesResult, customerJobs] = await Promise.all([
+    supabase
+      .from("vehicles")
+      .select(VEHICLE_SELECT)
+      .eq("customer_id", customerId)
+      .order("plate_number"),
+    fetchJobsForCustomer(customerId),
   ]);
 
-  const customerVehicles = (assertNoError(vehiclesResult, "getCustomer360") as VehicleRow[]).map(
-    vehicleFromRow,
-  );
-
-  const customerJobs = (assertNoError(jobsResult, "getCustomer360") as JobRow[]).map((row) => jobFromRow(row));
+  const customerVehicles = (
+    assertNoError(vehiclesResult, "getCustomer360") as VehicleRow[]
+  ).map(vehicleFromRow);
 
   const ltv = customerJobs.reduce((sum, job) => {
-    if (normalizeJobStatus(job.status) === "Completed" || normalizeJobStatus(job.status) === "Closed") {
+    if (
+      normalizeJobStatus(job.status) === "Completed" ||
+      normalizeJobStatus(job.status) === "Closed"
+    ) {
       return sum + job.total_amount;
     }
     return sum;

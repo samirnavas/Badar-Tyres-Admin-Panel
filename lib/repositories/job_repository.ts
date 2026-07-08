@@ -133,18 +133,37 @@ export async function getJobCards(): Promise<JobCard[]> {
 /**
  * Returns every job card belonging to a given customer, newest first.
  * Used by the CRM profile to render a customer's service history.
+ *
+ * Note: jobs have no customer_id DB column — customer lives in line_items __meta__.
+ * We therefore look up by the customer's vehicle ids.
  */
 export async function getJobCardsByCustomerId(
   customerId: string,
 ): Promise<JobCard[]> {
   await simulateLatency();
+
+  const vehiclesResult = await supabase
+    .from("vehicles")
+    .select("id")
+    .eq("customer_id", customerId);
+  const vehicleIds = (
+    assertNoError(vehiclesResult, "getJobCardsByCustomerId") as { id: string }[]
+  ).map((row) => row.id);
+
+  if (vehicleIds.length === 0) {
+    return [];
+  }
+
   const result = await supabase
     .from("jobs")
     .select("*")
-    .eq("customer_id", customerId)
+    .in("vehicle_id", vehicleIds)
     .order("created_at", { ascending: false });
   const rows = assertNoError(result, "getJobCardsByCustomerId") as JobRow[];
-  return (rows ?? []).map((row) => normalizeJobRecord(jobFromRow(row)));
+
+  return (rows ?? [])
+    .map((row) => normalizeJobRecord(jobFromRow(row)))
+    .filter((job) => job.customer_id === customerId || !job.customer_id);
 }
 
 /**
